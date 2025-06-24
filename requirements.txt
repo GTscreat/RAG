@@ -1,0 +1,17 @@
+bs4
+openai
+anthropic
+langchain
+sentence_transformers
+langchain
+langchain_community
+langchain_huggingface
+qdrant_client
+httpx
+fastapi
+numpy
+tiktoken
+uvicorn
+ragas
+psutil
+hashlib
