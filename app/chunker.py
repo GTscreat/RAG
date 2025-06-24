@@ -1,4 +1,4 @@
-def chunk_articles(articles, max_chunk_size=384, overlap_size=256):
+def chunk_articles(articles, max_chunk_size=512, overlap_size=256):
     """
     articles: list of dicts (այս json-ով)
     max_chunk_size: չանկի առավելագույն չափ (տոկենին համարժեք)
