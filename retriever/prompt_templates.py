@@ -8,7 +8,9 @@ Based solely on the content provided below, answer the question or complete the 
 
 Question/task: {query}
 
-Content: {context}
+Content: \n\n
+
+{context}
 
 """
 

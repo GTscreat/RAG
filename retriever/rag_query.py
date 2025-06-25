@@ -19,7 +19,7 @@ if __name__ == "__main__":
         embedded_chunks = json.load(f)
 
     query_emb = embed_query(user_question)
-    top_chunks = get_top_k(query_emb, embedded_chunks, k=5)
+    top_chunks = get_top_k(query_emb, embedded_chunks, k=20)
 
     # Ստանալ թոփ չանկերին համապատասխանող ամբողջական հոդվածները՝ առանց կրկնության
     full_articles = get_full_articles_by_top_chunks(top_chunks, content_path=CONTENT_PATH)

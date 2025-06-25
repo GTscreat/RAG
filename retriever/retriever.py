@@ -11,7 +11,7 @@ def cosine_similarity(a, b):
     b = np.array(b)
     return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
 
-def get_top_k(query_emb, embedded_chunks, k=5):
+def get_top_k(query_emb, embedded_chunks, k=20):
     scored = [
         (cosine_similarity(query_emb, chunk["embedding"]), chunk)
         for chunk in embedded_chunks
