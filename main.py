@@ -35,5 +35,5 @@ while True:
     save_embeddings_to_file(embeddings, filepath="data/embeddings.json")
     print(f"{len(embeddings)} embeddings added to file.")
 
-    print("----- Սպասում ենք 3 րոպե -----")
-    time.sleep(180)
+    print("----- Սպասում ենք 1 րոպե -----")
+    time.sleep(60)

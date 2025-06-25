@@ -9,6 +9,7 @@ __pycache__/
 *.pyc
 *.env
 .DS_Store
-data/embedded_sql.json
+/data 
+\data
 
 

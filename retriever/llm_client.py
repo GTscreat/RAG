@@ -1,7 +1,7 @@
 import os
 import logging
 from typing import List, Dict, Any, Optional
-from retriever.prompt_templates import QA_TEMPLATE, SQL_QA_TEMPLATE, ROLE_SYSTEM
+from retriever.prompt_templates import PROMPT_TEMPLATE, ROLE_SYSTEM
 from openai import OpenAI
 
 MODEL_PROVIDER = os.getenv("LLM_PROVIDER", "openai")
@@ -36,23 +36,23 @@ def call_anthropic(prompt: str, temperature: float = 0.1) -> str:
     )
     message = client.messages.create(
         model=ANTHROPIC_MODEL,
-        system="Դու օգնական ես, որը աշխատում է SQL փաստաթղթերի հետ.",
+        system="Դու օգնական ես, որը աշխատում է փաստաթղթերի հետ.",
         messages=[{"role": "user", "content": prompt}],
         temperature=temperature,
     )
     return message.content[0].text.strip()
 
-def build_sql_prompt(query, articles, model):
+def build_prompt(query, articles, model):
     """
     Articles is a list of dicts, each containing the full metadata and content.
     """
     # For context, join all articles in a readable format
     context = "\n---\n".join(
-        f"ID: {a.get('id')}\nTitle: {a.get('title')}\nWebsite: {a.get('website_url')}\nURL: {a.get('news_url')}\nPublished at: {a.get('published_at')}\nMeta: {a.get('meta','')}\nContent: {a.get('content')}" for a in articles
+        f"ID: {a.get('id')}\nTitle: {a.get('title')}\nURL: {a.get('url')}\nPublished at: {a.get('published_at')}\nMeta: {a.get('meta','')}\nContent: {a.get('content')}" for a in articles
     )
-    return SQL_QA_TEMPLATE.format(context=context, query=query)
+    return PROMPT_TEMPLATE.format(context=context, query=query)
 
-def generate_sql_answer(
+def generate_answer(
     query: str,
     articles: List[Dict[str, Any]],
     provider: Optional[str] = None
@@ -64,7 +64,8 @@ def generate_sql_answer(
         model = ANTHROPIC_MODEL
     else:
         raise ValueError("Unsupported LLM provider.")
-    prompt = build_sql_prompt(query, articles, model)
+    prompt = build_prompt(query, articles, model)
+    print(prompt)
     try:
         if provider == "openai":
             answer = call_openai(prompt)

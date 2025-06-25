@@ -1,7 +1,7 @@
 import os
 import json
 from retriever.retriever import embed_query, get_top_k, get_full_articles_by_top_chunks
-from retriever.llm_client import generate_sql_answer
+from retriever.llm_client import generate_answer
 
 def main():
     user_question = input("Ի՞նչ հարց ունեք։\n> ")
@@ -17,7 +17,7 @@ def main():
     # Ստանալ թոփ չանկերին համապատասխանող հոդվածները՝ առանց կրկնության, ամբողջությամբ
     full_articles = get_full_articles_by_top_chunks(top_chunks, content_path="data/content.json")
 
-    result = generate_sql_answer(user_question, full_articles)
+    result = generate_answer(user_question, full_articles)
     print("\n=== Պատասխան ===\n")
     print(result["answer"])
 
