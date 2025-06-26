@@ -1,7 +1,8 @@
 import json
 import os
-from retriever.retriever import embed_query, get_top_k, get_full_articles_by_top_chunks
-from retriever.llm_client import generate_sql_answer
+from retriever.retriever import embed_query, get_top_k_unique_articles
+from retriever.llm_client import generate_answer
+from retriever.prompt_templates import TOP_ID
 
 if __name__ == "__main__":
     user_question = input("Ի՞նչ հարց ունեք։\n> ")
@@ -19,10 +20,8 @@ if __name__ == "__main__":
         embedded_chunks = json.load(f)
 
     query_emb = embed_query(user_question)
-    top_chunks = get_top_k(query_emb, embedded_chunks, k=20)
+    # Վերցնում ենք similarity-ով ամենամոտ չանկերին համապատասխանող տարբեր հոդվածներ
+    full_articles = get_top_k_unique_articles(query_emb, embedded_chunks, content_path=CONTENT_PATH, top_id=TOP_ID)
 
-    # Ստանալ թոփ չանկերին համապատասխանող ամբողջական հոդվածները՝ առանց կրկնության
-    full_articles = get_full_articles_by_top_chunks(top_chunks, content_path=CONTENT_PATH)
-
-    result = generate_sql_answer(user_question, full_articles)
+    result = generate_answer(user_question, full_articles)
     print(result["answer"])
