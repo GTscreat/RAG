@@ -12,21 +12,21 @@ while True:
     print("----- Կատարվում է API հարցում -----")
     data = fetch_articles()
     if data is None:
-        print("Հոդվածներ ստանալը ձախողվեց։ Սպասում ենք 3 րոպե...")
-        time.sleep(180)
+        print("Հոդվածներ ստանալը ձախողվեց։ Սպասում ենք 1 րոպե...")
+        time.sleep(60)
         continue
 
     articles = data.get('data', [])
     if not articles:
-        print("Հոդվածների ցանկը դատարկ է։ Սպասում ենք 3 րոպե...")
-        time.sleep(180)
+        print("Հոդվածների ցանկը դատարկ է։ Սպասում ենք 1 րոպե...")
+        time.sleep(60)
         continue
 
     # --- Ֆիլտրում ենք նոր հոդվածները և ավելացնում content.json-ում
     new_articles = filter_new_articles(articles, filepath="data/content.json")
     if not new_articles:
-        print("Նոր հոդվածներ չկան։ Սպասում ենք 3 րոպե...")
-        time.sleep(180)
+        print("Նոր հոդվածներ չկան։ Սպասում ենք 1 րոպե...")
+        time.sleep(60)
         continue
 
     print(f"{len(new_articles)} նոր հոդված հայտնաբերվեց։")

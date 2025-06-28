@@ -11,7 +11,7 @@ pip install -r requirements.txt
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 .\.venv\Scripts\python.exe -m pip install ......
-
+pip install -r requirements.txt
 
 
 git status

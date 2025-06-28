@@ -57,18 +57,52 @@ def save_embeddings_to_file(embeddings: List[Dict[str, Any]], filepath="data/emb
     with open(filepath, 'w', encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
-# For user queries:
 def embed_query(query: str) -> np.ndarray:
     return model.encode([f"query: {query}"], normalize_embeddings=True)[0]
+
+def compute_article_average_embeddings(
+    chunk_embeddings: List[Dict[str, Any]],
+    output_path: str = "data/id_embeddings.json"
+):
+    """
+    Computes average (mean) embedding per article id based on chunk embeddings.
+    Saves results as a list of dicts: [{"id": id, "embedding": [...]}, ...]
+    """
+    from collections import defaultdict
+
+    # Group embeddings by id
+    id_to_embs = defaultdict(list)
+    for item in chunk_embeddings:
+        id_to_embs[item["id"]].append(item["embedding"])
+
+    avg_results = []
+    for article_id, embs in id_to_embs.items():
+        embs_arr = np.array(embs)
+        avg_emb = np.mean(embs_arr, axis=0)
+        avg_results.append({
+            "id": article_id,
+            "embedding": avg_emb.tolist()
+        })
+
+    # Save to file
+    with open(output_path, "w", encoding="utf-8") as f:
+        json.dump(avg_results, f, ensure_ascii=False, indent=2)
+
+    return avg_results
 
 if __name__ == "__main__":
     # Օրինակ, եթե run անես embedding.py-ն առանձին
     import sys
     from chunker import chunk_articles
+
     # Ենթադրում ենք՝ test_articles.json ֆայլ կա
     with open("test_articles.json", "r", encoding="utf-8") as f:
         articles = json.load(f)
     chunks = chunk_articles(articles)
     embeddings = embed_chunks(chunks)
     save_embeddings_to_file(embeddings)
-    print("Embeddings saved.")
+    print("Chunk embeddings saved to data/embeddings.json.")
+
+    # Հաշվել և պահել յուրաքանչյուր նյութի միջին embedding-ը
+    compute_article_average_embeddings(embeddings, output_path="data/id_embeddings.json")
+    print("Average article embeddings saved to data/id_embeddings.json.")

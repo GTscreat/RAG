@@ -1,0 +1,63 @@
+[
+  {
+    "id": 187992,
+    "entities": [
+      {
+        "entity_group": "LOC",
+        "score": 0.9970384836196899,
+        "word": "Ծ",
+        "start": 27,
+        "end": 28
+      },
+      {
+        "entity_group": "LOC",
+        "score": 0.9702757000923157,
+        "word": "իծեռնակաբերդի",
+        "start": 28,
+        "end": 41
+      },
+      {
+        "entity_group": "ORG",
+        "score": 0.9997355341911316,
+        "word": "",
+        "start": 117,
+        "end": 118
+      },
+      {
+        "entity_group": "ORG",
+        "score": 0.9470430612564087,
+        "word": "Ճգնաժամային կառավարման ազգային կենտրոն",
+        "start": 117,
+        "end": 155
+      },
+      {
+        "entity_group": "LOC",
+        "score": 0.996536374092102,
+        "word": "Ծ",
+        "start": 178,
+        "end": 179
+      },
+      {
+        "entity_group": "LOC",
+        "score": 0.9342289566993713,
+        "word": "իծեռնակաբերդի",
+        "start": 179,
+        "end": 192
+      },
+      {
+        "entity_group": "ORG",
+        "score": 0.9955712556838989,
+        "word": "ՆԳՆ ՓԾ",
+        "start": 246,
+        "end": 252
+      },
+      {
+        "entity_group": "LOC",
+        "score": 0.8757734298706055,
+        "word": "Երեւան քաղաքի",
+        "start": 253,
+        "end": 265
+      }
+    ]
+  }
+]

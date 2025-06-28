@@ -3,15 +3,18 @@ import hashlib
 import requests
 from datetime import datetime
 import json
+from dotenv import load_dotenv
 
+load_dotenv()
 def fetch_articles():
-    secret = os.getenv('TOKEN_APP_KEY')
+    secret = "kdFqv3GDtbgryi-1RAtMDwFa80WQuDPwYcFDie4r9zs=" # os.getenv("TOKEN_APP_KEY") 
     expected_token = hashlib.sha256(f"{secret}{datetime.now().strftime('%Y-%m-%d')}".encode()).hexdigest()
+    print(expected_token)
     url = (
         "http://185.133.248.60/api/v1/articles"
-        "?per_page=3&page=1"
+        "?per_page=1&page=1"
         "&websites=azatutyun.am,news.am"
-        "&from=2025-06-27&to=2025-06-27"
+        "&from=2025-06-28&to=2025-06-28"
         f"&token={expected_token}"
     )
     response = requests.get(url)

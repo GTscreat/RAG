@@ -9,7 +9,7 @@ __pycache__/
 *.pyc
 *.env
 .DS_Store
-/data 
-\data
 /__MACOSX
-
+/data/scrapped.sql
+/data/embeddings.json
+news.json

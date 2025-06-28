@@ -5,7 +5,7 @@ import numpy as np
 from sentence_transformers import SentenceTransformer
 
 # === Կոնֆիգուրացիա ===
-NEWS_PATH = "data/news.json"
+NEWS_PATH = "news.json"
 EMBEDDINGS_PATH = "data/embeddings.json"
 MODEL_PATH = os.getenv("ARMENIAN_EMBEDDING_MODEL_PATH", "Metric-AI/armenian-text-embeddings-1")
 
