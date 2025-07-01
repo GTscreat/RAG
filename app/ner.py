@@ -9,6 +9,47 @@ def load_ner_pipeline():
     ner_pipeline = pipeline("ner", model=model, tokenizer=tokenizer, aggregation_strategy="simple")
     return ner_pipeline
 
+def merge_entities(entities, group_key="entity_group", word_key="word", start_key="start", end_key="end", score_key="score"):
+    if not entities:
+        return []
+    merged = []
+    entities = sorted(entities, key=lambda x: x[start_key])
+    buffer = entities[0].copy()
+    for ent in entities[1:]:
+        # Եթե նույն խմբի է և անմիջապես հաջորդում է
+        if ent[group_key] == buffer[group_key] and ent[start_key] == buffer[end_key]:
+            buffer[word_key] += ent[word_key]
+            buffer[end_key] = ent[end_key]
+            buffer[score_key] = max(buffer[score_key], ent[score_key])
+        else:
+            merged.append(buffer)
+            buffer = ent.copy()
+    merged.append(buffer)
+    return merged
+
+def merge_any_adjacent_entities(entities, word_key="word", start_key="start", end_key="end", score_key="score"):
+    if not entities:
+        return []
+    merged = []
+    entities = sorted(entities, key=lambda x: x[start_key])
+    buffer = entities[0].copy()
+    buffer_groups = [buffer["entity_group"]]
+    for ent in entities[1:]:
+        # Եթե անմիջապես հաջորդում է (կամ ընդամենը մեկ բացատ է)
+        if ent[start_key] <= buffer[end_key] + 1:
+            buffer[word_key] += ent[word_key]
+            buffer[end_key] = ent[end_key]
+            buffer[score_key] = max(buffer[score_key], ent[score_key])
+            buffer_groups.append(ent["entity_group"])
+        else:
+            buffer["entity_group"] = list(set(buffer_groups))
+            merged.append(buffer)
+            buffer = ent.copy()
+            buffer_groups = [buffer["entity_group"]]
+    buffer["entity_group"] = list(set(buffer_groups))
+    merged.append(buffer)
+    return merged
+
 def run_ner_on_articles(articles, ner_pipeline):
     """
     articles: List[Dict], ամեն հոդված dict:
@@ -24,15 +65,12 @@ def run_ner_on_articles(articles, ner_pipeline):
     for article in articles:
         text = article.get("title", "") + "\n" + article.get("content", "")
         entities = ner_pipeline(text)
+        entities = merge_entities(entities)
         results.append({
             "id": article["id"],
             "entities": entities
         })
     return results
-
-def save_ner_results(results, filepath="data/ner_results.json"):
-    with open(filepath, "w", encoding="utf-8") as f:
-        json.dump(results, f, ensure_ascii=False, indent=2)
 
 def to_python_type(obj):
     """
