@@ -1,0 +1,428 @@
+[
+  {
+    "id": 192464,
+    "entities": [
+      {
+        "entity_group": "PER",
+        "score": 0.9997472167015076,
+        "word": "Միհրան Մախսուդյանի",
+        "start": 0,
+        "end": 18
+      },
+      {
+        "entity_group": "LOC",
+        "score": 0.9878666400909424,
+        "word": "",
+        "start": 95,
+        "end": 96
+      },
+      {
+        "entity_group": "LOC",
+        "score": 0.8757159113883972,
+        "word": "Ոսկեպար",
+        "start": 95,
+        "end": 102
+      },
+      {
+        "entity_group": "PER",
+        "score": 0.9840540885925293,
+        "word": "Միհրան Մախսուդ",
+        "start": 121,
+        "end": 135
+      },
+      {
+        "entity_group": "ORG",
+        "score": 0.9342401027679443,
+        "word": "«Վարդաշեն",
+        "start": 156,
+        "end": 165
+      },
+      {
+        "entity_group": "ORG",
+        "score": 0.784075915813446,
+        "word": "ՔԿՀ",
+        "start": 167,
+        "end": 170
+      },
+      {
+        "entity_group": "PER",
+        "score": 0.991611659526825,
+        "word": "Աննա Մանթաշյանը",
+        "start": 209,
+        "end": 224
+      },
+      {
+        "entity_group": "PER",
+        "score": 0.9941753149032593,
+        "word": "Մանթաշյան",
+        "start": 232,
+        "end": 241
+      },
+      {
+        "entity_group": "PER",
+        "score": 0.9996882677078247,
+        "word": "Միհրան Մախսուդյան",
+        "start": 257,
+        "end": 274
+      },
+      {
+        "entity_group": "MISC",
+        "score": 0.9636897444725037,
+        "word": "տավուշ",
+        "start": 439,
+        "end": 445
+      },
+      {
+        "entity_group": "PER",
+        "score": 0.9997194409370422,
+        "word": "",
+        "start": 456,
+        "end": 457
+      },
+      {
+        "entity_group": "PER",
+        "score": 0.9997666478157043,
+        "word": "Ոսկան Սարգսյանը",
+        "start": 456,
+        "end": 471
+      },
+      {
+        "entity_group": "PER",
+        "score": 0.999267041683197,
+        "word": "Մախսուդյանի",
+        "start": 490,
+        "end": 501
+      },
+      {
+        "entity_group": "PER",
+        "score": 0.9481463432312012,
+        "word": "Մախսուդյանի",
+        "start": 566,
+        "end": 577
+      },
+      {
+        "entity_group": "PER",
+        "score": 0.9996145963668823,
+        "word": "Մ.Մախսուդյան",
+        "start": 620,
+        "end": 632
+      },
+      {
+        "entity_group": "PER",
+        "score": 0.9995571374893188,
+        "word": "Նիկոլ Փաշինյանի",
+        "start": 857,
+        "end": 872
+      },
+      {
+        "entity_group": "LOC",
+        "score": 0.9994714856147766,
+        "word": "Հայաստանի",
+        "start": 883,
+        "end": 892
+      }
+    ]
+  },
+  {
+    "id": 192462,
+    "entities": [
+      {
+        "entity_group": "LOC",
+        "score": 0.9953898787498474,
+        "word": "Դիլիջան",
+        "start": 0,
+        "end": 7
+      },
+      {
+        "entity_group": "ORG",
+        "score": 0.999764621257782,
+        "word": "Կառավարությունն",
+        "start": 86,
+        "end": 101
+      },
+      {
+        "entity_group": "ORG",
+        "score": 0.9992603659629822,
+        "word": "Հայաստանի Հանրապետության",
+        "start": 185,
+        "end": 209
+      },
+      {
+        "entity_group": "ORG",
+        "score": 0.9991756677627563,
+        "word": "Ասիական զարգացման բանկի",
+        "start": 212,
+        "end": 235
+      },
+      {
+        "entity_group": "LOC",
+        "score": 0.9998155236244202,
+        "word": "Հայաստան",
+        "start": 261,
+        "end": 269
+      },
+      {
+        "entity_group": "LOC",
+        "score": 0.9997997879981995,
+        "word": "Վրաստան",
+        "start": 270,
+        "end": 277
+      },
+      {
+        "entity_group": "LOC",
+        "score": 0.5452888011932373,
+        "word": "Մ",
+        "start": 316,
+        "end": 317
+      },
+      {
+        "entity_group": "LOC",
+        "score": 0.8860534429550171,
+        "word": "",
+        "start": 319,
+        "end": 320
+      },
+      {
+        "entity_group": "LOC",
+        "score": 0.9857863187789917,
+        "word": "Վանաձոր",
+        "start": 319,
+        "end": 326
+      },
+      {
+        "entity_group": "LOC",
+        "score": 0.9583101868629456,
+        "word": "Բագրատաշեն",
+        "start": 327,
+        "end": 337
+      },
+      {
+        "entity_group": "LOC",
+        "score": 0.9904754757881165,
+        "word": "ՀՀ",
+        "start": 443,
+        "end": 445
+      },
+      {
+        "entity_group": "LOC",
+        "score": 0.9895742535591125,
+        "word": "Մ",
+        "start": 493,
+        "end": 494
+      },
+      {
+        "entity_group": "LOC",
+        "score": 0.9200397729873657,
+        "word": "Վանաձոր",
+        "start": 496,
+        "end": 503
+      },
+      {
+        "entity_group": "LOC",
+        "score": 0.9993562698364258,
+        "word": "Ալավերդի",
+        "start": 523,
+        "end": 531
+      },
+      {
+        "entity_group": "LOC",
+        "score": 0.9996321201324463,
+        "word": "ՀՀ",
+        "start": 534,
+        "end": 536
+      },
+      {
+        "entity_group": "LOC",
+        "score": 0.9304789900779724,
+        "word": "Բագրատաշեն",
+        "start": 545,
+        "end": 555
+      },
+      {
+        "entity_group": "LOC",
+        "score": 0.9866478443145752,
+        "word": "Դիլիջան",
+        "start": 688,
+        "end": 695
+      },
+      {
+        "entity_group": "LOC",
+        "score": 0.865405261516571,
+        "word": "Պուշկին",
+        "start": 699,
+        "end": 706
+      },
+      {
+        "entity_group": "MISC",
+        "score": 0.8920316696166992,
+        "word": "Վարկային համաձայն",
+        "start": 884,
+        "end": 901
+      },
+      {
+        "entity_group": "LOC",
+        "score": 0.9933576583862305,
+        "word": "Դեբեդ",
+        "start": 990,
+        "end": 995
+      },
+      {
+        "entity_group": "LOC",
+        "score": 0.9870359301567078,
+        "word": "Մ",
+        "start": 1062,
+        "end": 1063
+      },
+      {
+        "entity_group": "LOC",
+        "score": 0.9916374087333679,
+        "word": "Ձորագետ",
+        "start": 1148,
+        "end": 1155
+      },
+      {
+        "entity_group": "LOC",
+        "score": 0.9971840977668762,
+        "word": "Դեբեդ",
+        "start": 1158,
+        "end": 1163
+      },
+      {
+        "entity_group": "LOC",
+        "score": 0.9905571341514587,
+        "word": "Դիլիջան",
+        "start": 1254,
+        "end": 1261
+      }
+    ]
+  },
+  {
+    "id": 192461,
+    "entities": [
+      {
+        "entity_group": "ORG",
+        "score": 0.7682520151138306,
+        "word": "Գործ",
+        "start": 117,
+        "end": 121
+      },
+      {
+        "entity_group": "LOC",
+        "score": 0.9992764592170715,
+        "word": "ՀՀ",
+        "start": 139,
+        "end": 141
+      },
+      {
+        "entity_group": "ORG",
+        "score": 0.9367119669914246,
+        "word": "ԵԱՏՄ",
+        "start": 170,
+        "end": 174
+      },
+      {
+        "entity_group": "LOC",
+        "score": 0.9997029900550842,
+        "word": "Հայաստանի",
+        "start": 490,
+        "end": 499
+      },
+      {
+        "entity_group": "LOC",
+        "score": 0.9866434931755066,
+        "word": "Հայաստանում",
+        "start": 598,
+        "end": 609
+      },
+      {
+        "entity_group": "LOC",
+        "score": 0.9984978437423706,
+        "word": "Հայաստանի",
+        "start": 817,
+        "end": 826
+      },
+      {
+        "entity_group": "LOC",
+        "score": 0.917343258857727,
+        "word": "Հայաստանից",
+        "start": 1085,
+        "end": 1095
+      },
+      {
+        "entity_group": "ORG",
+        "score": 0.999467670917511,
+        "word": "Ջի Թի Բի ստիլ",
+        "start": 1380,
+        "end": 1393
+      },
+      {
+        "entity_group": "ORG",
+        "score": 0.9970447421073914,
+        "word": "Ձուլակենտրոն",
+        "start": 1397,
+        "end": 1409
+      },
+      {
+        "entity_group": "ORG",
+        "score": 0.9834237098693848,
+        "word": "Էդմետ",
+        "start": 1413,
+        "end": 1418
+      },
+      {
+        "entity_group": "ORG",
+        "score": 0.9652953147888184,
+        "word": "Ասկե գրուպ",
+        "start": 1422,
+        "end": 1432
+      },
+      {
+        "entity_group": "ORG",
+        "score": 0.962781548500061,
+        "word": "Տաշիր գրուպ",
+        "start": 1436,
+        "end": 1447
+      },
+      {
+        "entity_group": "LOC",
+        "score": 0.9916172623634338,
+        "word": "Քարակերտ",
+        "start": 1450,
+        "end": 1458
+      },
+      {
+        "entity_group": "ORG",
+        "score": 0.9995032548904419,
+        "word": "Ասեդլ",
+        "start": 1483,
+        "end": 1488
+      }
+    ]
+  },
+  {
+    "id": 192460,
+    "entities": [
+      {
+        "entity_group": "PER",
+        "score": 0.999777615070343,
+        "word": "Սուրեն Պապիկյան",
+        "start": 71,
+        "end": 86
+      },
+      {
+        "entity_group": "PER",
+        "score": 0.9998223185539246,
+        "word": "Սուրեն Պապիկյանը",
+        "start": 180,
+        "end": 196
+      },
+      {
+        "entity_group": "ORG",
+        "score": 0.9989739656448364,
+        "word": "ԱԺ",
+        "start": 214,
+        "end": 216
+      }
+    ]
+  }
+]

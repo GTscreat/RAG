@@ -1,6 +1,7 @@
 import json
 import numpy as np
 from ranker.thematic_classifier import load_thematic_embeddings, classify_topic_article
+from ranker.frequency_classifier import run_frequency_classifier
 
 def load_json(path):
     try:
@@ -58,6 +59,9 @@ def main():
 
     # 6. Պահպանել parameters.json-ը
     save_json(parameters, "data/parameters.json")
+
+    # 7. Frequency classifier step
+    run_frequency_classifier()
 
 if __name__ == "__main__":
     main()

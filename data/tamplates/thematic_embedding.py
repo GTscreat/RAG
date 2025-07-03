@@ -1,5 +1,5 @@
 import json
-from embedding import embed_chunks
+from app.embedding import embed_chunks
 
 def load_thematic_corpus(path="data/tamplates/thematic_corpus.json"):
     with open(path, "r", encoding="utf-8") as f:
