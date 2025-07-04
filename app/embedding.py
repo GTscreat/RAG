@@ -2,7 +2,8 @@ from sentence_transformers import SentenceTransformer
 from typing import List, Dict, Any, Union
 import numpy as np
 import os
-import json
+
+from db import SessionLocal, Embedding
 
 MODEL_PATH = os.getenv(
     "ARMENIAN_EMBEDDING_MODEL_PATH",
@@ -15,13 +16,13 @@ def embed_chunks(
     chunks: Union[List[Dict[str, Any]], List[str]],
     batch_size: int = 32,
     prefix: str = "passage: ",
-    save_path: str = None,
-    save_mode: str = "bulk"  # "bulk" կամ "append"
+    save_mode: str = "bulk"  # "bulk" կամ "update"
 ) -> List[Dict[str, Any]]:
     """
     Armenian chunk embedding with correct prefix.
     Accepts both list of dicts (with 'chunk_content') or list of strings.
-    If save_path is provided, saves embeddings either in 'bulk' or 'append' mode.
+    If save_mode == "bulk", returns embeddings as list (for external save).
+    If save_mode == "update", embeddings are written directly to DB.
     """
     # --- 1. Input normalization
     if not chunks:
@@ -45,56 +46,23 @@ def embed_chunks(
         result = dict(chunk)
         result["embedding"] = emb
         results.append(result)
-        # --- 2. Immediate (append) save mode
-        if save_path and save_mode == "append":
-            append_embedding_to_file(result, save_path)
 
-    # --- 3. Bulk save mode
-    if save_path and save_mode == "bulk":
-        save_embeddings_to_file(results, save_path)
-
+    if save_mode == "update":
+        session = SessionLocal()
+        for chunk, emb in zip(chunks, embeddings):
+            db_obj = session.query(Embedding).filter_by(id=chunk["id"]).first()
+            if db_obj:
+                db_obj.embedding = emb
+        session.commit()
+        session.close()
+    # bulk mode just returns the results (you can save them elsewhere)
     return results
-
-def append_embedding_to_file(embedding: Dict[str, Any], filepath="data/embeddings.json"):
-    """
-    Append a single embedding to the file.
-    """
-    try:
-        with open(filepath, 'r+', encoding='utf-8') as f:
-            try:
-                data = json.load(f)
-            except Exception:
-                data = []
-            data.append(embedding)
-            f.seek(0)
-            json.dump(data, f, ensure_ascii=False, indent=2)
-            f.truncate()
-    except FileNotFoundError:
-        with open(filepath, 'w', encoding='utf-8') as f:
-            json.dump([embedding], f, ensure_ascii=False, indent=2)
-
-def save_embeddings_to_file(embeddings: List[Dict[str, Any]], filepath="data/embeddings.json"):
-    """
-    Bulk save: Replace or append the whole embeddings list to the file.
-    """
-    if os.path.exists(filepath):
-        with open(filepath, 'r', encoding='utf-8') as f:
-            try:
-                data = json.load(f)
-            except Exception:
-                data = []
-    else:
-        data = []
-    data.extend(embeddings)
-    with open(filepath, 'w', encoding='utf-8') as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
 
 def embed_query(query: str) -> np.ndarray:
     return model.encode([f"query: {query}"], normalize_embeddings=True)[0]
 
 def compute_article_average_embeddings(
     chunk_embeddings: List[Dict[str, Any]],
-    output_path: str = "data/id_embeddings.json"
 ):
     from collections import defaultdict
     id_to_embs = defaultdict(list)
@@ -108,18 +76,19 @@ def compute_article_average_embeddings(
             "id": article_id,
             "embedding": avg_emb.tolist()
         })
-    with open(output_path, "w", encoding="utf-8") as f:
-        json.dump(avg_results, f, ensure_ascii=False, indent=2)
     return avg_results
 
 if __name__ == "__main__":
-    import sys
-    from chunker import chunk_articles
+    # For manual test/debug
+    import json
+    from app.chunker import chunk_articles
+
+    # Load test articles (provide your own test file)
     with open("test_articles.json", "r", encoding="utf-8") as f:
         articles = json.load(f)
     chunks = chunk_articles(articles)
-    # bulk save
-    embeddings = embed_chunks(chunks, save_path="data/embeddings.json", save_mode="bulk")
-    print("Chunk embeddings saved to data/embeddings.json.")
-    compute_article_average_embeddings(embeddings, output_path="data/id_embeddings.json")
-    print("Average article embeddings saved to data/id_embeddings.json.")
+    embeddings = embed_chunks(chunks, save_mode="bulk")
+    print("Chunk embeddings computed.")
+
+    avg_embs = compute_article_average_embeddings(embeddings)
+    print("Average article embeddings computed.")

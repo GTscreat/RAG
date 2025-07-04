@@ -2,18 +2,19 @@ import os
 import hashlib
 import requests
 from datetime import datetime
-import json
 from dotenv import load_dotenv
+from db import SessionLocal, Content
 
 load_dotenv()
+
 def fetch_articles():
-    secret = "kdFqv3GDtbgryi-1RAtMDwFa80WQuDPwYcFDie4r9zs=" # os.getenv("TOKEN_APP_KEY") 
+    secret = "kdFqv3GDtbgryi-1RAtMDwFa80WQuDPwYcFDie4r9zs="  # os.getenv("TOKEN_APP_KEY")
     expected_token = hashlib.sha256(f"{secret}{datetime.now().strftime('%Y-%m-%d')}".encode()).hexdigest()
     url = (
         "http://185.133.248.60/api/v1/articles"
-        "?per_page=10&page=1"
+        "?per_page=20&page=1"
         "&websites=azatutyun.am,news.am"
-        "&from=2025-07-3&to=2025-07-03"
+        "&from=2025-07-02&to=2025-07-02"
         f"&token={expected_token}"
     )
     response = requests.get(url)
@@ -23,33 +24,39 @@ def fetch_articles():
     data = response.json()
     return data
 
-def append_articles_to_file(new_articles, filepath="data/content.json"):
-    # Կարդում ենք արդեն եղած հոդվածները (եթե կա)
-    if os.path.exists(filepath):
-        with open(filepath, "r", encoding="utf-8") as f:
-            try:
-                existing = json.load(f)
-            except Exception:
-                existing = []
-    else:
-        existing = []
+def insert_articles_to_db(new_articles):
+    session = SessionLocal()
+    count_new, count_existing = 0, 0
 
     # Եթե նոր հոդվածները dict է՝ ստանում ենք data դաշտը
     if isinstance(new_articles, dict):
-        # Եթե ունի 'data' դաշտ՝ վերցնում ենք դա, եթե ոչ՝ ամբողջ dict
         articles_to_add = new_articles.get('data', new_articles)
     else:
         articles_to_add = new_articles
 
-    # Ավելացնում ենք նորերը
-    existing.extend(articles_to_add)
-
-    # Գրում ենք ամբողջությամբ նորից (ավելացնում ենք վերջից)
-    with open(filepath, "w", encoding="utf-8") as f:
-        json.dump(existing, f, ensure_ascii=False, indent=2)
+    for art in articles_to_add:
+        # Ստուգում ենք՝ արդեն կա՞ նույն id-ով հոդված
+        exists = session.query(Content).filter_by(id=art.get("id")).first()
+        if not exists:
+            c = Content(
+                id=art.get("id"),
+                website=art.get("website"),
+                title=art.get("title"),
+                content=art.get("content"),
+                url=art.get("url"),
+                meta=art.get("meta"),
+                published_at=art.get("published_at"),
+            )
+            session.add(c)
+            count_new += 1
+        else:
+            count_existing += 1
+    session.commit()
+    session.close()
+    print(f"Նոր հոդվածներ ավելացվեց: {count_new} | Կրկնվող հոդվածներ չավելացվեցին: {count_existing}")
 
 if __name__ == "__main__":
     articles = fetch_articles()
     print(articles)
     if articles:
-        append_articles_to_file(articles)
+        insert_articles_to_db(articles)

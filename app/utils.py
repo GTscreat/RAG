@@ -1,24 +1,13 @@
-import os
-import json
+from db import SessionLocal, Content
 
-def load_json(filepath):
-    if os.path.exists(filepath):
-        with open(filepath, "r", encoding="utf-8") as f:
-            try:
-                return json.load(f)
-            except Exception:
-                return []
-    return []
-
-def save_json(data, filepath):
-    with open(filepath, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
-
-def filter_new_articles(articles, filepath="data/content.json"):
-    existing_articles = load_json(filepath)
-    existing_ids = set([a.get("id") for a in existing_articles])
+def filter_new_articles(articles):
+    """
+    articles: list of dicts (յուրաքանչյուրում 'id' դաշտ)
+    Ստուգում է՝ որոնք դեռ չկան Content աղյուսակում։
+    Վերադարձնում է նորերը (որոնք չկային բազայում)։
+    """
+    session = SessionLocal()
+    existing_ids = set(r[0] for r in session.query(Content.id).all())
     new_articles = [a for a in articles if a.get("id") not in existing_ids]
-    if new_articles:
-        updated_articles = existing_articles + new_articles
-        save_json(updated_articles, filepath)
+    session.close()
     return new_articles

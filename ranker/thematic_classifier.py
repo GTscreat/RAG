@@ -1,7 +1,8 @@
-import json
 import numpy as np
+from db import SessionLocal, Embedding, Parameter
 
 def load_thematic_embeddings(path="data/tamplates/thematic_corpus_embeddings.json"):
+    import json
     with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
 
@@ -38,31 +39,31 @@ def classify_topic_article(chunks_embeddings, thematic_embeddings, threshold=0.7
     else:
         return "այլ"
 
-def save_thematic_results(results, path="data/thematic_results.json"):
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(results, f, ensure_ascii=False, indent=2)
-
-if __name__ == "__main__":
-    # Բեռնում ենք thematic embeddings
+def run_thematic_classifier():
     thematic_embeddings = load_thematic_embeddings()
-    # Բեռնում ենք հոդվածների embeddings
-    with open("data/embeddings.json", "r", encoding="utf-8") as f:
-        all_embeddings = json.load(f)
-
-    # id-ով խմբավորում ենք embeddings-ը
+    session = SessionLocal()
+    # Բեռնում ենք բոլոր embeddings-ը՝ id-ով խմբավորած
     from collections import defaultdict
+    all_embeddings = session.query(Embedding).all()
     article_embeddings_map = defaultdict(list)
     for chunk in all_embeddings:
-        article_embeddings_map[chunk["id"]].append(chunk["embedding"])
-
+        article_embeddings_map[chunk.id].append(chunk.embedding)
     # Յուրաքանչյուր հոդվածի համար դասակարգում ենք թեման
-    thematic_results = []
+    updated, missed = 0, 0
     for art_id, chunk_embs in article_embeddings_map.items():
         topic = classify_topic_article(chunk_embs, thematic_embeddings)
-        thematic_results.append({
-            "id": art_id,
-            "topic": topic
-        })
+        # Թարմացնում ենք Parameter աղյուսակում տվյալ հոդվածի category դաշտը
+        param = session.query(Parameter).filter_by(id=art_id).first()
+        if param:
+            param.category = topic
+            updated += 1
+        else:
+            # Եթե չկա, կարող ես ավելացնել, կամ բաց թողնել
+            session.add(Parameter(id=art_id, category=topic, aver_embedding=None, similarity=None))
+            missed += 1
+    session.commit()
+    session.close()
+    print(f"Թեմատիկ դասակարգում. Թարմացվեց {updated} | Նոր ավելացվեց {missed}")
 
-    # Պահպանում ենք thematic_results.json-ում
-    save_thematic_results(thematic_results)
+if __name__ == "__main__":
+    run_thematic_classifier()
