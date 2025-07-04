@@ -1,7 +1,7 @@
 import numpy as np
 from db import SessionLocal, Content, Embedding, Parameter
-from ranker.thematic_classifier import load_thematic_embeddings, classify_topic_article
-from ranker.frequency_classifier import run_frequency_classifier
+from ranking.thematic_classifier import load_thematic_embeddings, classify_topic_article
+from ranking.frequency_classifier import run_frequency_classifier
 
 def average_pooling(embeddings):
     arr = np.array(embeddings)
