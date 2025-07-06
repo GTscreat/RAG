@@ -4,6 +4,9 @@ from app.chunker import chunk_articles_and_store
 from app.embedding import embed_chunks
 from app.utils import filter_new_articles
 from app.ner import load_ner_pipeline, run_ner_on_articles, save_ner_results_to_db
+from ranking.frequency_classifier import update_aver_embeddings, run_frequency_classifier
+from ranking.thematic_classifier import run_thematic_classifier
+from ranking.ranker import rank_news
 from db import SessionLocal, Embedding
 
 def main_loop():
@@ -66,6 +69,18 @@ def main_loop():
         ner_results = run_ner_on_articles(new_articles, ner_pipeline)
         save_ner_results_to_db(ner_results)  # NER արդյունքները NERResult աղյուսակում
         print(f"NER արդյունքները պահված են բազայում։")
+
+        print("----- Կատարվում է aver_embedding-ի թարմացում -----")
+        update_aver_embeddings()
+
+        print("----- Կատարվում է թեմատիկ դասակարգում -----")
+        run_thematic_classifier()
+
+        print("----- Կատարվում է հաճախականության դասակարգում -----")
+        run_frequency_classifier()
+
+        print("----- Կատարվում է նյութերի վարկանիշավորում -----")
+        rank_news()
 
         print("----- Սպասում ենք 1 րոպե -----")
         time.sleep(60)

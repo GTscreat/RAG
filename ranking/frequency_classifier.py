@@ -9,6 +9,34 @@ def cosine_similarity(a, b):
         return 0.0
     return float(np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b)))
 
+def average_pooling(embeddings):
+    arr = np.array(embeddings)
+    return arr.mean(axis=0).tolist()
+
+def update_aver_embeddings():
+    session = SessionLocal()
+
+    # article_id -> embeddings list
+    id_to_chunks = defaultdict(list)
+    all_embeddings = session.query(Embedding).filter(Embedding.embedding != None).all()
+    for emb in all_embeddings:
+        id_to_chunks[emb.article_id].append(emb.embedding)
+
+    # Հաշվարկում ենք միջին embedding-ը յուրաքանչյուր article_id-ի համար
+    for article_id, embeddings in id_to_chunks.items():
+        if embeddings:
+            avg_embedding = average_pooling(embeddings)
+            param = session.query(Parameter).filter_by(id=article_id).first()
+            if param:
+                param.aver_embedding = avg_embedding
+            else:
+                # Եթե Parameter աղյուսակում չկա, ավելացնում ենք նոր
+                session.add(Parameter(id=article_id, aver_embedding=avg_embedding, category=None, similarity=None))
+
+    session.commit()
+    session.close()
+    print("Parameters աղյուսակի aver_embedding սյունակը թարմացվեց։")
+
 def run_frequency_classifier():
     session = SessionLocal()
 
@@ -62,6 +90,3 @@ def run_frequency_classifier():
 
     session.commit()
     session.close()
-
-if __name__ == "__main__":
-    run_frequency_classifier()

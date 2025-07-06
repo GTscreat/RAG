@@ -12,3 +12,4 @@ __pycache__/
 /__MACOSX
 /data/scrapped.sql
 /data/embeddings_old.json
+.vscode

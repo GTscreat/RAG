@@ -1,4 +1,5 @@
 import numpy as np
+from collections import defaultdict
 from db import SessionLocal, Embedding, Parameter
 
 def load_thematic_embeddings(path="data/tamplates/thematic_corpus_embeddings.json"):
@@ -43,11 +44,10 @@ def run_thematic_classifier():
     thematic_embeddings = load_thematic_embeddings()
     session = SessionLocal()
     # Բեռնում ենք բոլոր embeddings-ը՝ id-ով խմբավորած
-    from collections import defaultdict
     all_embeddings = session.query(Embedding).all()
     article_embeddings_map = defaultdict(list)
     for chunk in all_embeddings:
-        article_embeddings_map[chunk.id].append(chunk.embedding)
+        article_embeddings_map[chunk.article_id].append(chunk.embedding)
     # Յուրաքանչյուր հոդվածի համար դասակարգում ենք թեման
     updated, missed = 0, 0
     for art_id, chunk_embs in article_embeddings_map.items():
@@ -64,6 +64,3 @@ def run_thematic_classifier():
     session.commit()
     session.close()
     print(f"Թեմատիկ դասակարգում. Թարմացվեց {updated} | Նոր ավելացվեց {missed}")
-
-if __name__ == "__main__":
-    run_thematic_classifier()
