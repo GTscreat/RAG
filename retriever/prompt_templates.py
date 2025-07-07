@@ -1,6 +1,8 @@
 """
-Prompt templates for Armenian News RAG QA.
+Prompt templates for Armenian News RAG.
 """
+
+TOP_ID = 20
 
 PROMPT_TEMPLATE = """
 
@@ -37,27 +39,16 @@ ROLE_SYSTEM = """
 """
 
 
-TOP_ID = 20
-
-
-QA_TEMPLATE = """You are an Armenian news assistant.
-Use only the following excerpts to answer the user's question.
-
-{context}
-
-Question: {query}
-Answer: If not in text, reply: 'Not available in provided excerpts.'
-If possible, cite authors and sources from the metadata for each statement.
-If the user asks for a direct quote, provide it exactly as in the excerpt.
+TOP_REQUEST_ROLE = """
+    "You are the editor in chief of a leading news outlet operating in the Armenian media landscape. 
+    You recieve the latest important news stories. 
+    Your task is to analyze each story, compare it with previously received news, and, 
+    considering the latest developments in and around Armenia’s social, political, security, and economic spheres, 
+    assign an importance score to each story on a scale of 1 to 5.
 """
 
-ADVANCED_QA_TEMPLATE = """You are an Armenian news assistant.
-You must answer the user's question using ONLY the provided excerpts below.
-Cite authors and sources from metadata for every factual claim if available.
-If the user requests a direct quote, provide it verbatim as found in the text.
+TOP_REQUEST = """
 
-{context}
-
-Question: {query}
-Answer: If not in text, reply: 'Not available in provided excerpts.'
+    
+    
 """

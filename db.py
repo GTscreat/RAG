@@ -3,7 +3,6 @@ from sqlalchemy import (
     create_engine, Column, Integer, String, Text, DateTime, Float, JSON, PickleType
 )
 from sqlalchemy.orm import sessionmaker, declarative_base
-import datetime
 
 SQLALCHEMY_DATABASE_URL = "sqlite:///./data/database.db"
 
@@ -23,7 +22,6 @@ class Content(Base):
     content = Column(Text)
     url = Column(String)
     meta = Column(JSON, nullable=True)   # image, iframe
-    # Եթե ապագայում պետք լինի՝ DateTime, բայց հիմա թողնում ենք str ձևաչափով.
     published_at = Column(String, index=True)
 
 # 2. Embeddings աղյուսակ (embeddings.json)
@@ -39,15 +37,13 @@ class Embedding(Base):
     chunk_content = Column(Text, nullable=True)
     chunk_start = Column(Integer, nullable=True)
     chunk_end = Column(Integer, nullable=True)
-    # Embedding-ը pickle-ով. PostgreSQL-ում հետագայում՝ ARRAY կամ JSONB:
     embedding = Column(PickleType, nullable=True)
 
 # 3. NER արդյունքներ (ner_results.json)
 class NERResult(Base):
     __tablename__ = "ner_results"
     id = Column(Integer, primary_key=True, index=True)
-    # entities-ը JSON դաշտում (entities = [{"entity_group":, ...}, ...])
-    entities = Column(JSON, nullable=True)
+    entities = Column(JSON, nullable=True)  # [{"entity_group":, ...}, ...]
 
 # 4. Parameters աղյուսակ (parameters.json)
 class Parameter(Base):
@@ -72,5 +68,11 @@ class Rank(Base):
     frequency_importance = Column(Float, nullable=True)
     source_importance = Column(Float, nullable=True)
     total_score = Column(Float, nullable=True)
+
+# 7. TOP աղյուսակ (top-25)
+class Top(Base):
+    __tablename__ = "top"
+    id = Column(Integer, primary_key=True, index=True)
+    total_score = Column(Float, nullable=False)
 
 Base.metadata.create_all(bind=engine)
