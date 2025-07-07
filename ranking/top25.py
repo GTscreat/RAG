@@ -1,97 +1,110 @@
 import os
-from sqlalchemy import desc
+from sqlalchemy.orm import Session
 from db import SessionLocal, Rank, Parameter, Content, Top
+from retriever.prompt_templates import TOP_REQUEST_ROLE, TOP_REQUEST
 from openai import OpenAI
-from retriever.prompt_templates import TOP_REQUEST_ROLE
 
-OPENAI_API_KEY=os.getenv("OPENAI_API_KEY")
-print(OPENAI_API_KEY)
-TOP_N = 25
-SIMILARITY_THRESHOLD = 0.9
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
+client = OpenAI(api_key=OPENAI_API_KEY)
 
-from sqlalchemy import Column, Integer, Float
+# Context buffer for last 5 prompts/responses
+class ContextMemory:
+    def __init__(self, size=5):
+        self.size = size
+        self.memory = []
 
-def get_top_ids():
-    session = SessionLocal()
-    # Վերցնել բոլոր id-ները և total_score-ները
-    all_ranks = session.query(Rank).order_by(desc(Rank.total_score)).all()
-    all_ids_scores = [(r.id, r.total_score) for r in all_ranks]
+    def add(self, user_message, assistant_message):
+        self.memory.append((user_message, assistant_message))
+        if len(self.memory) > self.size:
+            self.memory.pop(0)
 
-    # Վերցնել similarity dict-ը parameters աղյուսակից
-    param_map = {p.id: p.similarity for p in session.query(Parameter).all() if p.similarity}
+    def get(self):
+        messages = []
+        for user_msg, assistant_msg in self.memory:
+            messages.append({"role": "user", "content": user_msg})
+            messages.append({"role": "assistant", "content": assistant_msg})
+        return messages
 
+context_memory = ContextMemory(size=5)
+
+def get_top_ids_with_scores(db: Session, top_n=25, similarity_threshold=0.9):
+    # Get all ranks sorted by total_score desc
+    all_ranks = db.query(Rank).order_by(Rank.total_score.desc()).all()
     top_ids = []
-    for id_, score in all_ids_scores:
-        # Ստուգել՝ արդյոք արդեն կա նման id top_ids-ում
-        is_similar = False
-        for top_id in top_ids:
-            sim_list = param_map.get(top_id, [])
-            if any(sim['id'] == id_ and sim['similarity_index'] >= SIMILARITY_THRESHOLD for sim in sim_list):
-                is_similar = True
-                break
-            sim_list_rev = param_map.get(id_, [])
-            if any(sim['id'] == top_id and sim['similarity_index'] >= SIMILARITY_THRESHOLD for sim in sim_list_rev):
-                is_similar = True
-                break
-        if not is_similar:
-            top_ids.append(id_)
-        if len(top_ids) == TOP_N:
+    top_scores = []
+
+    # Load all similarity links from Parameter.similarity (assume one row, first one)
+    param = db.query(Parameter).first()
+    similarity_list = param.similarity if param and param.similarity else []
+
+    def is_similar(id1, id2):
+        # similarity_list = [{"id": ..., "similarity_index": ...}]
+        for sim in similarity_list:
+            if (sim["id"][0] == id1 and sim["id"][1] == id2) or (sim["id"][0] == id2 and sim["id"][1] == id1):
+                if sim["similarity_index"] >= similarity_threshold:
+                    return True
+        return False
+
+    for rank in all_ranks:
+        # Skip if this id is similar to any already in top_ids
+        if any(is_similar(rank.id, tid) for tid in top_ids):
+            continue
+        top_ids.append(rank.id)
+        top_scores.append(rank.total_score)
+        if len(top_ids) >= top_n:
             break
+    return list(zip(top_ids, top_scores))
 
-    # Թարմացնել TOP աղյուսակը՝ ORM-ով
-    session.query(Top).delete()
-    for id_ in top_ids:
-        score = next(s for i, s in all_ids_scores if i == id_)
-        session.add(Top(id=id_, total_score=score))
-    session.commit()
-    session.close()
-    return top_ids
+def update_top_table(db: Session, top_n=25):
+    top = get_top_ids_with_scores(db, top_n=top_n)
+    db.query(Top).delete()  # Clear existing
+    for id_, score in top:
+        db.add(Top(id=id_, total_score=score))
+    db.commit()
 
-def get_top_contents(top_ids):
-    session = SessionLocal()
-    contents = session.query(Content).filter(Content.id.in_(top_ids)).all()
-    id_to_content = {c.id: c.content for c in contents}
-    session.close()
-    return id_to_content
+def get_top_contents(db: Session):
+    # Return [(id, content)] for all in Top
+    top_entries = db.query(Top).order_by(Top.total_score.desc()).all()
+    contents = []
+    for top in top_entries:
+        content_row = db.query(Content).filter(Content.id == top.id).first()
+        if content_row:
+            contents.append((top.id, content_row.content))
+    return contents
 
-def ask_openai_for_top(top_ids, id_to_content, previous_messages=None, api_key=OPENAI_API_KEY):
-    client = OpenAI(api_key=api_key)
-    results = {}
+def openai_score_stories(top_contents):
+    # Build the input for one call
+    stories = []
+    for id_, content in top_contents:
+        stories.append(f'"id": "{id_}" - "content": "{content}"')
+    stories_str = "\n".join(stories)
 
-    # Եթե նախորդ մեսիջներ չկան, օգտագործել միայն system մեսիջը
-    if previous_messages is None:
-        previous_messages = [{"role": "system", "content": TOP_REQUEST_ROLE}]
-    else:
-        # Պահպանել միայն վերջին 5 մեսիջները (բացի system-ից)
-        sys_msgs = [msg for msg in previous_messages if msg["role"] == "system"]
-        other_msgs = [msg for msg in previous_messages if msg["role"] != "system"]
-        previous_messages = sys_msgs + other_msgs[-5:]
-
-    # Վերցնել նոր լուրերի տեքստերը ըստ top_ids
-    latest_news_batch = [id_to_content.get(id_, "") for id_ in top_ids]
-
-    # Կառուցել user prompt
-    user_prompt = "\n\nԼուրերի ցուցակ՝\n"
-    user_prompt += "\n".join([f"{i+1}. {news}" for i, news in enumerate(latest_news_batch)])
-
-    # Messages array
-    messages = previous_messages + [
-        {"role": "user", "content": user_prompt}
+    messages = [
+        {"role": "system", "content": TOP_REQUEST_ROLE.strip()},
+        {"role": "user", "content": TOP_REQUEST.strip() + "\n\n" + stories_str}
     ]
+    # Add previous context
+    messages = context_memory.get() + messages
 
-    print(messages)
+    response = client.chat.completions.create(
+        model="gpt-4o",
+        messages=messages,
+        temperature=0.2,
+        max_completion_tokens=512,
+        n=1
+    )
+    result = response.choices[0].message.content
+    context_memory.add(messages[-1]["content"], result)
+    return result
 
+def refresh_top_and_score():
+    db = SessionLocal()
     try:
-        response = client.chat.completions.create(
-            model="gpt-4o",
-            messages=messages,
-            temperature=0.2,
-            max_tokens=512,
-            n=1
-        )
-        answer = response.choices[0].message.content.strip()
-    except Exception as e:
-        answer = f"Error: {e}"
-
-    results["top25"] = answer
-    return results
+        update_top_table(db)
+        top_contents = get_top_contents(db)
+        if top_contents:
+            scores = openai_score_stories(top_contents)
+            return scores
+        return None
+    finally:
+        db.close()

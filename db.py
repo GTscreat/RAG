@@ -2,6 +2,7 @@
 from sqlalchemy import (
     create_engine, Column, Integer, String, Text, DateTime, Float, JSON, PickleType
 )
+from sqlalchemy import UniqueConstraint
 from sqlalchemy.orm import sessionmaker, declarative_base
 
 SQLALCHEMY_DATABASE_URL = "sqlite:///./data/database.db"
@@ -69,10 +70,13 @@ class Rank(Base):
     source_importance = Column(Float, nullable=True)
     total_score = Column(Float, nullable=True)
 
-# 7. TOP աղյուսակ (top-25)
+# 7. TOP-25 աղյուսակ
 class Top(Base):
     __tablename__ = "top"
-    id = Column(Integer, primary_key=True, index=True)
-    total_score = Column(Float, nullable=False)
+    id = Column(Integer, primary_key=True, index=True, unique=True)
+    total_score = Column(Float, nullable=True)
+    ai_score = Column(Float, nullable=True)      
+    final_score = Column(Float, nullable=True)  
+    __table_args__ = (UniqueConstraint('id', name='uix_top_id'),)
 
 Base.metadata.create_all(bind=engine)

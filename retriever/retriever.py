@@ -17,7 +17,7 @@ def get_top_k_unique_articles(query_emb, top_id=TOP_ID):
     """
     session = SessionLocal()
     # Վերցնում ենք բոլոր embeddings-ը
-    embedded_chunks = session.query(Embedding).all()
+    embedded_chunks = session.query(Embedding).filter(Embedding.embedding != None).all()
     # id-ով հավաքում ենք հոդվածները
     all_articles = session.query(Content).all()
     id_to_article = {str(article.id): article for article in all_articles}
@@ -26,27 +26,28 @@ def get_top_k_unique_articles(query_emb, top_id=TOP_ID):
     scored = [
         (cosine_similarity(query_emb, chunk.embedding), chunk)
         for chunk in embedded_chunks
+        if chunk.embedding is not None
     ]
     scored.sort(reverse=True, key=lambda x: x[0])
 
     selected_ids = set()
     selected_articles = []
     for sim, chunk in scored:
-        chunk_id = str(chunk.id)
-        if chunk_id not in selected_ids and chunk_id in id_to_article:
+        article_id = str(chunk.article_id)  # article_id-ն պետք է օգտագործվի
+        if article_id not in selected_ids and article_id in id_to_article:
             # ORM-ից dict դարձնել
-            article = id_to_article[chunk_id]
+            article = id_to_article[article_id]
             article_dict = {
                 "id": article.id,
                 "website": article.website,
                 "title": article.title,
-                "content": article.content,
+                "content": article.content,  # Ապահովել, որ content-ը բերվում է
                 "url": article.url,
                 "meta": article.meta,
                 "published_at": article.published_at
             }
             selected_articles.append(article_dict)
-            selected_ids.add(chunk_id)
+            selected_ids.add(article_id)
         if len(selected_articles) >= top_id:
             break
     session.close()

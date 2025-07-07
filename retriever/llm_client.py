@@ -29,18 +29,18 @@ def call_openai(prompt: str, temperature: float = 0.1) -> str:
     )
     return completion.choices[0].message.content.strip()
 
-def call_anthropic(prompt: str, temperature: float = 0.1) -> str:
-    import anthropic
-    client = anthropic.Anthropic(
-        api_key=os.getenv("ANTHROPIC_API_KEY")
-    )
-    message = client.messages.create(
-        model=ANTHROPIC_MODEL,
-        system="Դու օգնական ես, որը աշխատում է փաստաթղթերի հետ.",
-        messages=[{"role": "user", "content": prompt}],
-        temperature=temperature,
-    )
-    return message.content[0].text.strip()
+# def call_anthropic(prompt: str, temperature: float = 0.1) -> str:
+#     import anthropic
+#     client = anthropic.Anthropic(
+#         api_key=os.getenv("ANTHROPIC_API_KEY")
+#     )
+#     message = client.messages.create(
+#         model=ANTHROPIC_MODEL,
+#         system="Դու օգնական ես, որը աշխատում է փաստաթղթերի հետ.",
+#         messages=[{"role": "user", "content": prompt}],
+#         temperature=temperature,
+#     )
+#     return message.content[0].text.strip()
 
 def build_prompt(query, articles, model):
     """
@@ -48,8 +48,11 @@ def build_prompt(query, articles, model):
     """
     # For context, join all articles in a readable format
     context = "\n---\n".join(
-        f"ID: {a.get('id')}\nTitle: {a.get('title')}\nURL: {a.get('url')}\nPublished at: {a.get('published_at')}\nMeta: {a.get('meta','')}\nContent: {a.get('content')}" for a in articles
+        f"ID: {a.get('id')}\nTitle: {a.get('title')}\nURL: {a.get('url')}\nPublished at: {a.get('published_at')}\nContent: {a.get('content')}" 
+        for a in articles if a.get('content')  # Ապահովել, որ content-ը դատարկ չէ
     )
+    if not context:
+        context = "Հոդվածների կոնտենտը հասանելի չէ։"
     return PROMPT_TEMPLATE.format(context=context, query=query)
 
 def generate_answer(
@@ -69,8 +72,8 @@ def generate_answer(
     try:
         if provider == "openai":
             answer = call_openai(prompt)
-        elif provider == "anthropic":
-            answer = call_anthropic(prompt)
+        # elif provider == "anthropic":
+        #     answer = call_anthropic(prompt)
     except Exception as e:
         logger.error(f"LLM API error: {e}")
         answer = "Error: Could not generate answer."

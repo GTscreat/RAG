@@ -10,6 +10,10 @@ def main():
     # Վերցնում ենք similarity-ով ամենամոտ չանկերի տարբեր հոդվածներ՝ անմիջապես բազայից
     full_articles = get_top_k_unique_articles(query_emb, top_id=TOP_ID)
 
+    if not full_articles:
+        print("Հարցմանը համապատասխան հոդվածներ չեն գտնվել։")
+        return
+
     result = generate_answer(user_question, full_articles)
     print("\n=== Պատասխան ===\n")
     print(result["answer"])

@@ -7,7 +7,7 @@ if __name__ == "__main__":
 
     # 1․ Ստանում ենք հարցի embedding-ը
     query_emb = embed_query(user_question)
-
+    print(f"Query embedding: {query_emb}")
     # 2․ Վերցնում similarity-ով ամենամոտ չանկերի հոդվածները՝ արդեն տվյալների բազայից
     # get_top_k_unique_articles-ը պարտադիր պետք է վերափոխված լինի՝ տվյալները բազայից բերելու համար։
     full_articles = get_top_k_unique_articles(query_emb, top_id=TOP_ID)
