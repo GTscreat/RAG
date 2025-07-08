@@ -1,12 +1,12 @@
 import time
-from app.get_api import fetch_articles, insert_articles_to_db
-from app.chunker import chunk_articles_and_store
-from app.embedding import embed_chunks
-from app.utils import filter_new_articles
-from app.ner import load_ner_pipeline, run_ner_on_articles, save_ner_results_to_db
-from ranking.frequency_classifier import update_aver_embeddings, run_frequency_classifier
-from ranking.thematic_classifier import run_thematic_classifier
-from ranking.ranker import rank_news
+from collector.get_api import fetch_articles, insert_articles_to_db
+from collector.chunker import chunk_articles_and_store
+from collector.embedding import embed_chunks
+from collector.utils import filter_new_articles
+from collector.ner import load_ner_pipeline, run_ner_on_articles, save_ner_results_to_db
+from ranker.frequency_classifier import update_aver_embeddings, run_frequency_classifier
+from ranker.thematic_classifier import run_thematic_classifier
+from ranker.ranking import rank_news
 from db import SessionLocal, Embedding
 
 def main_loop():

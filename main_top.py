@@ -1,5 +1,5 @@
-from ranking.top25 import refresh_top_and_score
-from ranking.top10 import update_top_with_ai_score
+from ranker.top25 import refresh_top_and_score
+from ranker.top10 import update_top_with_ai_score
 
 def main():
     scores = refresh_top_and_score()

@@ -14,9 +14,9 @@ def fetch_articles():
     # expected_token = hashlib.sha256(f"{secret}{yesterday.strftime('%Y-%m-%d')}".encode()).hexdigest()
     url = (
         "http://185.133.248.60/api/v1/articles"
-        "?per_page=20&page=4"
-        "&websites=azatutyun.am,news.am"
-        "&from=2025-07-07&to=2025-07-07"
+        "?per_page=10&page=1"
+        "&websites=azatutyun.am"
+        "&from=2025-07-08&to=2025-07-08"
         f"&token={expected_token}"
     )
     response = requests.get(url)

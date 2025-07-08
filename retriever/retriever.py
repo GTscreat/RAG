@@ -1,6 +1,6 @@
 import numpy as np
 from db import SessionLocal, Embedding, Content
-from app.embedding import model
+from collector.embedding import model
 from retriever.prompt_templates import TOP_ID
 
 def embed_query(text):
