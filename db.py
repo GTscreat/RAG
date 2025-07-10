@@ -75,8 +75,18 @@ class Top(Base):
     __tablename__ = "top"
     id = Column(Integer, primary_key=True, index=True, unique=True)
     total_score = Column(Float, nullable=True)
-    ai_score = Column(Float, nullable=True)      
-    final_score = Column(Float, nullable=True)  
+    ai_score = Column(Float, nullable=True)
+    urgency = Column(Integer, nullable=True)
+    sentiment = Column(String, nullable=True)
+    geopolitical = Column(String, nullable=True)
+    final_score = Column(Float, nullable=True)
     __table_args__ = (UniqueConstraint('id', name='uix_top_id'),)
+
+# 8. processed աղյուսակ
+class Processed(Base):
+    __tablename__ = "processed"
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    base_id = Column(Integer, index=True)  # բազային նյութի id
+    generated_content = Column(Text, nullable=False)
 
 Base.metadata.create_all(bind=engine)
