@@ -85,8 +85,9 @@ class Top(Base):
 # 8. processed աղյուսակ
 class Processed(Base):
     __tablename__ = "processed"
-    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    base_id = Column(Integer, index=True)  # բազային նյութի id
-    generated_content = Column(Text, nullable=False)
+    id = Column(Integer, primary_key=True, index=True)
+    base_id = Column(Integer, unique=True, index=True)
+    generated_content = Column(Text, nullable=True)
+    published = Column(String, default=None, index=True)
 
 Base.metadata.create_all(bind=engine)

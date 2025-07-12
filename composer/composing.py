@@ -2,46 +2,76 @@
 from db import SessionLocal, Content, Parameter, Top, Processed
 import json
 from composer.llm_prompts import (
-    OPERATIONAL_HIGH, FORMAT_BRIEF, LANGUAGE_ARMENIAN,
+    ROLE1, OPERATIONAL_HIGH, FORMAT_BRIEF, LANGUAGE_ARMENIAN,
     OBJECTIVITY_NEUTRAL, STYLE_DIRECT,
-    OBJECTIVITY_TOPIC_ADJUSTED, STYLE_REPHRASED, TELEGRAM_POST, TITLE_TELEGRAM_CHANNEL
+    OBJECTIVITY_TOPIC_ADJUSTED, STYLE_REPHRASED, TITLE_TELEGRAM_CHANNEL
 )
 from openai import OpenAI
+
+MAX_CONTEXT_LEN = 2000  # Խորհուրդ է տրվում՝ չափազանց երկար տեքստերը կրճատել
+
+def format_back_context(text, source=None):
+    if not text:
+        return None
+    text = text.strip()
+    if not text.endswith(('.', '։', '!', '?')):
+        text += '։'
+    # source-ը չօգտագործել, եթե չկա
+    if len(text) > MAX_CONTEXT_LEN:
+        text = text[:MAX_CONTEXT_LEN].rsplit(' ', 1)[0] + '…'
+    return text
 
 def prompt_gen_request(base_id):
     session = SessionLocal()
     try:
         # Վերցնել հիմնական կոնտենտը
         main_news = session.query(Content.content).filter(Content.id == base_id).scalar()
+
         # Վերցնել similarity id-ները
         param = session.query(Parameter.similarity).filter(Parameter.id == base_id).scalar()
         back_contexts = []
         if param:
             try:
-                sim_list = json.loads(param)
+                if isinstance(param, str):
+                    sim_list = json.loads(param)
+                elif isinstance(param, list):
+                    sim_list = param
+                else:
+                    raise ValueError("Unexpected type for param")
+
                 for sim in sim_list:
                     cid = sim.get("id")
                     if cid:
-                        ctx = session.query(Content.content).filter(Content.id == cid).scalar()
-                        if ctx:
-                            back_contexts.append(ctx)
-            except Exception:
-                pass
+                        ctx_content = session.query(Content.content).filter(Content.id == cid).scalar()
+                        if ctx_content:
+                            formatted_ctx = format_back_context(ctx_content)  # աղբյուր չկա
+                            if formatted_ctx:
+                                back_contexts.append(formatted_ctx)
+
+            except Exception as e:
+                print(f"[ERROR] Failed to process similarity data: {e}")
+
         # Վերցնել geopolitical
         geopolitical = session.query(Top.geopolitical).filter(Top.id == base_id).scalar()
+
         # Կառուցել պրոմպտ
-        prompt = OPERATIONAL_HIGH + FORMAT_BRIEF + LANGUAGE_ARMENIAN + TITLE_TELEGRAM_CHANNEL + TELEGRAM_POST
+        prompt = ROLE1 + OPERATIONAL_HIGH + LANGUAGE_ARMENIAN + TITLE_TELEGRAM_CHANNEL + FORMAT_BRIEF
         if geopolitical == "antiarmenian":
             prompt += OBJECTIVITY_TOPIC_ADJUSTED + STYLE_REPHRASED
         else:
             prompt += OBJECTIVITY_NEUTRAL + STYLE_DIRECT
+
         # Ամբողջ բովանդակությունը
         content = {
             "main_news": main_news,
-            "back_context": back_contexts
+            "back_contexts": back_contexts
         }
         return prompt, content
-        
+
+        # Եթե ցանկանաս content-ը դարձնել մաքուր տեքստ պրոմպտի համար, փոխարինիր հետևյալով՝
+        # prompt_input = f"Main news: {main_news}\n\nContext:\n" + "\n".join([f"- {ctx}" for ctx in back_contexts])
+        # return prompt, prompt_input
+
     finally:
         session.close()
 
@@ -50,6 +80,7 @@ def generate_content_with_openai(prompt, content):
     messages = [
         {"role": "system", "content": prompt},
         {"role": "user", "content": json.dumps(content, ensure_ascii=False)}
+        # Եթե content-ը փոխես string-ի, ապա գրիր՝ {"role": "user", "content": content}
     ]
     print(messages)
     completion = client.chat.completions.create(
