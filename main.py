@@ -115,7 +115,7 @@ def main_blocks():
             processed_count += 1
         print(f"Done. Total processed: {processed_count}")
 
-        print("----- Բլոկները ավարտվեցին, սպասում ենք 3 րոպե -----")
+        print("----- Շրջանն ավարտվեց, սպասում ենք 3 րոպե -----")
         time.sleep(180)  # 3 րոպե
 
 def spreader_block(wakeup_event):

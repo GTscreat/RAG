@@ -1,65 +1,51 @@
 import os
 import hashlib
 import requests
-<<<<<<< HEAD
 from datetime import datetime, timezone
-=======
 from datetime import datetime, timedelta, timezone
->>>>>>> af9f7c1306457baccdb18a196f05e72add56f907
 from dotenv import load_dotenv
 from db import SessionLocal, Content
 
 load_dotenv()
 
 # Ֆայլային պահոց էջի համարի համար
-def get_last_page(filename="last_page.txt"):
-    try:
-        with open(filename, "r") as f:
-            return int(f.read().strip())
-    except (FileNotFoundError, ValueError):
-        return 1  # Եթե ֆայլը չկա կամ վնասված է, սկսում ենք 1-ից
+# def get_last_page(filename="last_page.txt"):
+#     try:
+#         with open(filename, "r") as f:
+#             return int(f.read().strip())
+#     except (FileNotFoundError, ValueError):
+#         return 1  # Եթե ֆայլը չկա կամ վնասված է, սկսում ենք 1-ից
 
-def save_last_page(page, filename="last_page.txt"):
-    with open(filename, "w") as f:
-        f.write(str(page))
+# def save_last_page(page, filename="last_page.txt"):
+#     with open(filename, "w") as f:
+#         f.write(str(page))
 
 def fetch_articles():
     secret = os.getenv("TOKEN_APP_KEY")
-<<<<<<< HEAD
     expected_token = hashlib.sha256(f"{secret}{datetime.now(timezone.utc).strftime('%Y-%m-%d')}".encode()).hexdigest()
-    # yesterday = datetime.now() - timedelta(days=1)
-    # expected_token = hashlib.sha256(f"{secret}{yesterday.strftime('%Y-%m-%d')}".encode()).hexdigest()
-    print(expected_token)
+    # current_page = get_last_page()
+    
+    TIME_FORMAT = "%Y-%m-%d %H:%M"
+    now = datetime.now(timezone.utc)
+    to_time = now.strftime(TIME_FORMAT)
+    from_time = (now - timedelta(minutes=100)).strftime(TIME_FORMAT)
+
     url = (
         "http://185.133.248.60/api/v1/articles"
-        "?per_page=10&page=2"
-        "&websites=azatutyun.am,1lurer.am"
-        "&from=2025-07-11&to=2025-07-11"
-=======
-    expected_token = hashlib.sha256(f"{secret}{datetime.now().strftime('%Y-%m-%d')}".encode()).hexdigest()
-    yesterday = datetime.now() - timedelta(days=1)
-    # expected_token = hashlib.sha256(f"{secret}{yesterday.strftime('%Y-%m-%d')}".encode()).hexdigest()
-    
-    # Ստանում ենք նախորդ էջը
-    current_page = get_last_page()
-    
-    url = (
-        "http://185.133.248.60/api/v1/articles"
-        f"?per_page=30&page={current_page}"
-        "&websites=news.am,1lurer.am,armenpress.am"
-        f"&from={yesterday.strftime('%Y-%m-%d')}"
-        f"&to={yesterday.strftime('%Y-%m-%d')}"
->>>>>>> af9f7c1306457baccdb18a196f05e72add56f907
+        # f"?per_page=50&page={current_page}"
+        "?per_page=20&page=1"
+        "&websites=news.am,1lurer.am,armenpress.am,armtimes.com,hraparak.am,arm.sputniknews.ru"
+        f"&from={from_time}&to={to_time}"
         f"&token={expected_token}"
     )
-
+    
     response = requests.get(url)
     if response.status_code != 200:
         print("❌ Սխալ հարցման ժամանակ:", response.status_code, response.text)
         return None
 
-    # Հաջող հարցման դեպքում պահում ենք հաջորդ էջը
-    save_last_page(current_page + 1)
+    # # Հաջող հարցման դեպքում պահում ենք հաջորդ էջը
+    # save_last_page(current_page + 1)
 
     data = response.json()
     return data

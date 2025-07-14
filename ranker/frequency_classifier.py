@@ -59,7 +59,7 @@ def run_frequency_classifier():
         if id_ not in seen:
             last_ids.append(id_)
             seen.add(id_)
-        if len(last_ids) == 50:
+        if len(last_ids) == 100:
             break
     base_ids = set(last_ids)
 

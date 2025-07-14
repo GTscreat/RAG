@@ -11,7 +11,7 @@ MIN_FREQ = 0.0        # similarity գումարի min, նորմալիզացիա�
 MAX_FREQ = 3.0        # similarity գումարի max, նորմալիզացիայի համար
 
 # Կշիռներ (պետական կարեւորության scoring)
-THEMATIC_W = 0.35
+THEMATIC_W = 0.3
 NER_W = 0.3
 FREQ_W = 0.3
 SOURCE_W = 0.15
