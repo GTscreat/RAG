@@ -81,7 +81,7 @@ def compute_article_average_embeddings(
 if __name__ == "__main__":
     # For manual test/debug
     import json
-    from app.chunker import chunk_articles
+    from collector.chunker import chunk_articles
 
     # Load test articles (provide your own test file)
     with open("test_articles.json", "r", encoding="utf-8") as f:

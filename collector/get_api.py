@@ -1,7 +1,7 @@
 import os
 import hashlib
 import requests
-from datetime import datetime, timedelta
+from datetime import datetime, timezone
 from dotenv import load_dotenv
 from db import SessionLocal, Content
 
@@ -9,14 +9,15 @@ load_dotenv()
 
 def fetch_articles():
     secret = os.getenv("TOKEN_APP_KEY")
-    expected_token = hashlib.sha256(f"{secret}{datetime.now().strftime('%Y-%m-%d')}".encode()).hexdigest()
+    expected_token = hashlib.sha256(f"{secret}{datetime.now(timezone.utc).strftime('%Y-%m-%d')}".encode()).hexdigest()
     # yesterday = datetime.now() - timedelta(days=1)
     # expected_token = hashlib.sha256(f"{secret}{yesterday.strftime('%Y-%m-%d')}".encode()).hexdigest()
+    print(expected_token)
     url = (
         "http://185.133.248.60/api/v1/articles"
-        "?per_page=5&page=5"
-        "&websites=news.am"
-        "&from=2025-07-10&to=2025-07-10"
+        "?per_page=10&page=2"
+        "&websites=azatutyun.am,1lurer.am"
+        "&from=2025-07-11&to=2025-07-11"
         f"&token={expected_token}"
     )
     response = requests.get(url)

@@ -13,3 +13,4 @@ __pycache__/
 /data/scrapped.sql
 /data/embeddings_old.json
 .vscode
+data/database.db
