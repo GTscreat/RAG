@@ -4,7 +4,8 @@ import json
 from composer.llm_prompts import (
     ROLE1, OPERATIONAL_HIGH, FORMAT_BRIEF, LANGUAGE_ARMENIAN,
     OBJECTIVITY_NEUTRAL, STYLE_DIRECT,
-    OBJECTIVITY_TOPIC_ADJUSTED, STYLE_REPHRASED, TITLE_TELEGRAM_CHANNEL
+    OBJECTIVITY_TOPIC_ADJUSTED, STYLE_REPHRASED, TITLE_TELEGRAM_CHANNEL,
+    TELEGRAM_OUTPUT_FORMAT
 )
 from openai import OpenAI
 
@@ -55,7 +56,7 @@ def prompt_gen_request(base_id):
         geopolitical = session.query(Top.geopolitical).filter(Top.id == base_id).scalar()
 
         # Կառուցել պրոմպտ
-        prompt = ROLE1 + OPERATIONAL_HIGH + LANGUAGE_ARMENIAN + TITLE_TELEGRAM_CHANNEL + FORMAT_BRIEF
+        prompt = ROLE1 + OPERATIONAL_HIGH + LANGUAGE_ARMENIAN + TITLE_TELEGRAM_CHANNEL + FORMAT_BRIEF + TELEGRAM_OUTPUT_FORMAT
         if geopolitical == "antiarmenian":
             prompt += OBJECTIVITY_TOPIC_ADJUSTED + STYLE_REPHRASED
         else:
@@ -89,10 +90,36 @@ def generate_content_with_openai(prompt, content):
     )
     return completion.choices[0].message.content
 
-def save_processed(base_id, generated_content):
+def save_processed(base_id, openai_response):
+    import re
     session = SessionLocal()
     try:
-        processed = Processed(base_id=base_id, generated_content=generated_content)
+        title = ""
+        content = ""
+        # Try to parse as JSON
+        try:
+            result = json.loads(openai_response)
+            # If it's a dict
+            if isinstance(result, dict):
+                title = result.get("title", "")
+                content = result.get("content", "")
+            # If it's a list of dicts
+            elif isinstance(result, list) and len(result) > 0 and isinstance(result[0], dict):
+                title = result[0].get("title", "")
+                content = result[0].get("content", "")
+            else:
+                raise ValueError("Unexpected format")
+        except Exception:
+            # Fallback: regex extraction from string like ["title": "...", "content": "..."]
+            match = re.search(r'\[title:\s*"([^"]+)",\s*content:\s*"([^"]+)"\]', openai_response)
+            if match:
+                title = match.group(1)
+                content = match.group(2)
+            else:
+                print("[ERROR] Failed to parse OpenAI response for title/content")
+                content = openai_response  # fallback: save raw response
+
+        processed = Processed(base_id=base_id, title=title, generated_content=content)
         session.add(processed)
         session.commit()
     finally:

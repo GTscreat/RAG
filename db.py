@@ -87,6 +87,7 @@ class Processed(Base):
     __tablename__ = "processed"
     id = Column(Integer, primary_key=True, index=True)
     base_id = Column(Integer, unique=True, index=True)
+    title = Column(String, nullable=True)  # <-- Add this line
     generated_content = Column(Text, nullable=True)
     published = Column(String, default=None, index=True)
 

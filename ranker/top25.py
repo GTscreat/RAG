@@ -35,7 +35,7 @@ def cosine_similarity(vec1, vec2):
         return 0.0
     return float(np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2)))
 
-def get_top_ids_with_scores(db: Session, top_n=25, similarity_threshold=0.9):
+def get_top_ids_with_scores(db: Session, top_n=25, similarity_threshold=0.85):
     all_ranks = db.query(Rank).order_by(Rank.total_score.desc()).all()
     top_ids = []
     top_scores = []
@@ -84,6 +84,7 @@ def get_top_ids_with_scores(db: Session, top_n=25, similarity_threshold=0.9):
         if len(top_ids) == top_n:
             break
 
+    print(f"Top candidates after filtering: {len(top_ids)}")
     return list(zip(top_ids, top_scores))
 
 def update_top_table(db: Session, top_n=25):

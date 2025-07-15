@@ -28,7 +28,7 @@ def fetch_articles():
     TIME_FORMAT = "%Y-%m-%d %H:%M"
     now = datetime.now(timezone.utc)
     to_time = now.strftime(TIME_FORMAT)
-    from_time = (now - timedelta(minutes=100)).strftime(TIME_FORMAT)
+    from_time = (now - timedelta(minutes=15)).strftime(TIME_FORMAT)
 
     url = (
         "http://185.133.248.60/api/v1/articles"
@@ -52,23 +52,26 @@ def fetch_articles():
 
 def insert_articles_to_db(new_articles):
     session = SessionLocal()
-    count_new, count_existing = 0, 0
+    count_new, count_existing, count_skipped = 0, 0, 0
 
-    # Եթե նոր հոդվածները dict են՝ ստանում ենք data դաշտը
     if isinstance(new_articles, dict):
         articles_to_add = new_articles.get('data', new_articles)
     else:
         articles_to_add = new_articles
 
     for art in articles_to_add:
-        # Ստուգում ենք՝ արդեն կա՞ նույն id-ով հոդված
+        content = art.get("content")
+        # Skip articles with empty content
+        if not content or str(content).strip() == "":
+            count_skipped += 1
+            continue
         exists = session.query(Content).filter_by(id=art.get("id")).first()
         if not exists:
             c = Content(
                 id=art.get("id"),
                 website=art.get("website"),
                 title=art.get("title"),
-                content=art.get("content"),
+                content=content,
                 url=art.get("url"),
                 meta=art.get("meta"),
                 published_at=art.get("published_at"),
@@ -79,7 +82,7 @@ def insert_articles_to_db(new_articles):
             count_existing += 1
     session.commit()
     session.close()
-    print(f"✅ Նոր հոդվածներ ավելացվեց: {count_new} | 🔁 Կրկնվող հոդվածներ չավելացվեցին: {count_existing}")
+    print(f"✅ Նոր հոդվածներ ավելացվեց: {count_new} | 🔁 Կրկնվող հոդվածներ չավելացվեցին: {count_existing} | ⏭️ Դատարկ հոդվածներ բաց թողնվեցին: {count_skipped}")
 
 if __name__ == "__main__":
     articles = fetch_articles()

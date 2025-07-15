@@ -31,19 +31,19 @@ def main_blocks():
         data = fetch_articles()
         if data is None:
             print("Հոդվածներ ստանալը ձախողվեց։ Սպասում ենք հաջորդ ցիկլին...")
-            time.sleep(180)
+            time.sleep(90)
             continue
 
         articles = data.get('data', [])
         if not articles:
             print("Հոդվածների ցանկը դատարկ է։ Սպասում ենք հաջորդ ցիկլին...")
-            time.sleep(180)
+            time.sleep(90)
             continue
 
         new_articles = filter_new_articles(articles)
         if not new_articles:
             print("Նոր հոդվածներ չկան։ Սպասում ենք հաջորդ ցիկլին...")
-            time.sleep(180)
+            time.sleep(90)
             continue
 
         print(f"{len(new_articles)} նոր հոդված հայտնաբերվեց։")
@@ -115,8 +115,8 @@ def main_blocks():
             processed_count += 1
         print(f"Done. Total processed: {processed_count}")
 
-        print("----- Շրջանն ավարտվեց, սպասում ենք 3 րոպե -----")
-        time.sleep(180)  # 3 րոպե
+        print("----- Շրջանն ավարտվեց, սպասում ենք 1.5 րոպե -----")
+        time.sleep(90)  # 3 րոպե
 
 def spreader_block(wakeup_event):
     while True:

@@ -131,3 +131,7 @@ Generate a clear, engaging, and descriptive title suitable for a website article
 TITLE_TELEGRAM_CHANNEL = """
 Start with short, impactful headline suitable for Telegram channel publication consisting of only a few words based solely on the provided information.\n
 """
+
+TELEGRAM_OUTPUT_FORMAT = """
+Return the output strictly in the following format: [title: "...", content: "..."]
+"""
