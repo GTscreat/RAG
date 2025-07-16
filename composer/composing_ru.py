@@ -2,8 +2,8 @@
 from db import SessionLocal, Content, Parameter, Top, Processed
 import json
 from composer.llm_prompts import (
-    ROLE1, OPERATIONAL_HIGH, FORMAT_BRIEF, LANGUAGE_ARMENIAN,
-    OBJECTIVITY_NEUTRAL, STYLE_DIRECT,
+    ROLE2, OPERATIONAL_BALANCED, FORMAT_DETAILED, LANGUAGE_RUSSIAN,
+    OBJECTIVITY_OPPOSITION, STYLE_DIRECT,
     OBJECTIVITY_TOPIC_ADJUSTED, STYLE_REPHRASED, TITLE_TELEGRAM_CHANNEL,
     TELEGRAM_OUTPUT_FORMAT
 )
@@ -11,7 +11,7 @@ from openai import OpenAI
 
 MAX_CONTEXT_LEN = 2000  # Խորհուրդ է տրվում՝ չափազանց երկար տեքստերը կրճատել
 
-def format_back_context(text, source=None):
+def format_back_context_ru(text, source=None):
     if not text:
         return None
     text = text.strip()
@@ -22,7 +22,7 @@ def format_back_context(text, source=None):
         text = text[:MAX_CONTEXT_LEN].rsplit(' ', 1)[0] + '…'
     return text
 
-def prompt_gen_request(base_id):
+def prompt_gen_request_ru(base_id):
     session = SessionLocal()
     try:
         # Վերցնել հիմնական կոնտենտը
@@ -45,7 +45,7 @@ def prompt_gen_request(base_id):
                     if cid:
                         ctx_content = session.query(Content.content).filter(Content.id == cid).scalar()
                         if ctx_content:
-                            formatted_ctx = format_back_context(ctx_content)  # աղբյուր չկա
+                            formatted_ctx = format_back_context_ru(ctx_content)  # աղբյուր չկա
                             if formatted_ctx:
                                 back_contexts.append(formatted_ctx)
 
@@ -56,11 +56,11 @@ def prompt_gen_request(base_id):
         geopolitical = session.query(Top.geopolitical).filter(Top.id == base_id).scalar()
 
         # Կառուցել պրոմպտ
-        prompt = ROLE1 + OPERATIONAL_HIGH + LANGUAGE_ARMENIAN + TITLE_TELEGRAM_CHANNEL + FORMAT_BRIEF + TELEGRAM_OUTPUT_FORMAT
+        prompt = ROLE2 + OPERATIONAL_BALANCED + FORMAT_DETAILED + LANGUAGE_RUSSIAN + TITLE_TELEGRAM_CHANNEL + TELEGRAM_OUTPUT_FORMAT
         if geopolitical == "antiarmenian":
             prompt += OBJECTIVITY_TOPIC_ADJUSTED + STYLE_REPHRASED
         else:
-            prompt += OBJECTIVITY_NEUTRAL + STYLE_DIRECT
+            prompt += OBJECTIVITY_OPPOSITION + STYLE_DIRECT
 
         # Ամբողջ բովանդակությունը
         content = {
@@ -76,7 +76,7 @@ def prompt_gen_request(base_id):
     finally:
         session.close()
 
-def generate_content_with_openai(prompt, content):
+def generate_content_with_openai_ru(prompt, content):
     client = OpenAI()
     messages = [
         {"role": "system", "content": prompt},
@@ -89,7 +89,7 @@ def generate_content_with_openai(prompt, content):
     )
     return completion.choices[0].message.content
 
-def save_processed(base_id, openai_response):
+def save_processed_ru(base_id, openai_response):
     import re
     session = SessionLocal()
     try:
@@ -112,8 +112,14 @@ def save_processed(base_id, openai_response):
                 print("[ERROR] Failed to parse OpenAI response for title/content")
                 content = openai_response  # fallback: save raw response
 
-        processed = Processed(base_id=base_id, title=title, generated_content=content)
-        session.add(processed)
+        # Փնտրում ենք արդեն առկա row-ը և թարմացնում տվյալները
+        existing = session.query(Processed).filter(Processed.base_id == base_id).first()
+        if existing:
+            existing.title_r = title
+            existing.generated_content_r = content
+        else:
+            processed = Processed(base_id=base_id, title_r=title, generated_content_r=content)
+            session.add(processed)
         session.commit()
     finally:
         session.close()

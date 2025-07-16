@@ -19,10 +19,12 @@ from ranker.top_over import update_top_with_ai_score
 # --- Content Generation Imports ---
 from composer.selector import get_next_unprocessed_top_id
 from composer.composing import prompt_gen_request, generate_content_with_openai, save_processed
+from composer.composing_ru import prompt_gen_request_ru, generate_content_with_openai_ru, save_processed_ru
+
 
 # --- Spreader Imports ---
 from spreader.selector import select_to_publish
-from spreader.publishing import publishing_cycle, get_urgent_value
+from spreader.publishing import publishing_cycle, get_urgent_value, publishing_cycle_ru
 
 def main_blocks():
     ner_pipeline = load_ner_pipeline()
@@ -103,17 +105,27 @@ def main_blocks():
 
         print("----- Կատարվում է նոր գեներացված կոնտենտի ստեղծում TOP-ի համար -----")
         processed_count = 0
+
+        
         for _ in range(10):
             next_id = get_next_unprocessed_top_id()
             if not next_id:
                 print("No new top content to process.")
                 break
+        
+            # Armenian content
             prompt, content = prompt_gen_request(next_id)
             generated = generate_content_with_openai(prompt, content)
             save_processed(next_id, generated)
-            print(f"Generated and saved new content for base_id={next_id}")
+            print(f"Generated and saved Armenian content for base_id={next_id}")
+        
+            # Russian content
+            prompt_ru, content_ru = prompt_gen_request_ru(next_id)
+            generated_ru = generate_content_with_openai_ru(prompt_ru, content_ru)
+            save_processed_ru(next_id, generated_ru)
+            print(f"Generated and saved Russian content for base_id={next_id}")
+        
             processed_count += 1
-        print(f"Done. Total processed: {processed_count}")
 
         print("----- Շրջանն ավարտվեց, սպասում ենք 1.5 րոպե -----")
         time.sleep(90)  # 3 րոպե
@@ -124,9 +136,13 @@ def spreader_block(wakeup_event):
         select_to_publish()
         print("[DEBUG] select_to_publish() ավարտվեց")
         sleep_time = publishing_cycle()
-        print(f"[DEBUG] publishing_cycle() sleep_time={sleep_time}")
-        print(f"Հրապարակման ցիկլից հետո սպասում ենք {sleep_time} վայրկյան...")
-        woke_up = wakeup_event.wait(timeout=sleep_time)
+        if sleep_time is None:
+            sleep_time = 90  # default value
+        sleep_time_ru = publishing_cycle_ru()
+        if sleep_time_ru is None:
+            sleep_time_ru = 90  # default value
+        print(f"Հրապարակման ցիկլից հետո սպասում ենք {max(sleep_time, sleep_time_ru)} վայրկյան...")
+        woke_up = wakeup_event.wait(timeout=max(sleep_time, sleep_time_ru))
         if woke_up:
             print("[SPREADER] Urgent detected, waking up for immediate publishing.")
             wakeup_event.clear()

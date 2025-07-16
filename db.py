@@ -87,8 +87,11 @@ class Processed(Base):
     __tablename__ = "processed"
     id = Column(Integer, primary_key=True, index=True)
     base_id = Column(Integer, unique=True, index=True)
-    title = Column(String, nullable=True)  # <-- Add this line
+    title = Column(String, nullable=True)
     generated_content = Column(Text, nullable=True)
     published = Column(String, default=None, index=True)
+    title_r = Column(String, nullable=True)
+    generated_content_r = Column(Text, nullable=True)
+    published_r = Column(String, default=None, index=True)
 
 Base.metadata.create_all(bind=engine)

@@ -76,7 +76,7 @@ def select_to_publish():
             print(f"[DEBUG] Chosen ID for publishing: {chosen_id}")
             db.query(Processed).filter(
                 Processed.base_id == chosen_id
-            ).update({'published': 'publish'})
+            ).update({'published': 'publish', 'published_r': 'publish'})
             db.commit()
         else:
             print("[ERROR] No chosen ID for publishing.")
