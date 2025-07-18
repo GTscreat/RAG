@@ -14,7 +14,6 @@ __pycache__/
 /data/embeddings_old.json
 .vscode
 data/database.db
-data/nerdatabase.db
 test2.py
 test3.py
 data/content_only.json
