@@ -1,66 +1,73 @@
+# ranker/ner_importance.py
 import json
-import sqlite3
+from db import SessionLocal, NERResult, Entity, EntityCategory
 
-def calculate_ner_importance(content_id: int, content_db_path: str, ner_db_path: str) -> float:
+def calculate_ner_importance(content_id: int) -> float:
     """
-    Հաշվում է կոնտենտի NER-երի կարևորությունը՝ հիմնվելով նոր տրամաբանության վրա։
+    Հաշվում է կոնտենտի NER-երի կարևորությունը՝ օգտագործելով 
+    միասնական PostgreSQL տվյալների բազան։
 
     Args:
         content_id: Կոնտենտի ID-ն, որի համար պետք է հաշվարկ կատարել։
-        content_db_path: Ճանապարհ դեպի հիմնական բազա (ner_results աղյուսակով)։
-        ner_db_path: Ճանապարհ դեպի NER-երի բազան (entities և categories աղյուսակներով)։
 
     Returns:
         NER բառերի գործակիցների արտադրյալների ընդհանուր գումարը։
     """
-    total_score_sum = 0.0
+    # Օգտագործում ենք 'with' բլոկը՝ սեսիայի անվտանգ կառավարման համար
+    with SessionLocal() as session:
+        try:
+            # 1. Վերցնում ենք կոնտենտի NER բառերը `ner_results` աղյուսակից
+            ner_result_obj = session.query(NERResult.entities).filter(NERResult.id == content_id).first()
+            
+            if not ner_result_obj or not ner_result_obj.entities:
+                return 0.0  # Եթե NER-եր չկան, վերադարձնում ենք 0
+
+            # SQLAlchemy-ն JSONB դաշտը ավտոմատ վերադարձնում է որպես Python dict/list
+            ner_entities = ner_result_obj.entities
+            words_to_check = {entity.get("word") for entity in ner_entities if entity.get("word")}
+
+            if not words_to_check:
+                return 0.0
+
+            # 2. Կատարում ենք ՄԵԿ արդյունավետ հարցում՝ բոլոր բառերի տվյալները ստանալու համար
+            # Սա փոխարինում է հին կոդի ցիկլի մեջ կատարվող բազմաթիվ հարցումներին
+            word_scores_query = session.query(
+                Entity.word,
+                Entity.ner_score,
+                EntityCategory.ner_category_index  # Օգտագործում ենք ճիշտ սյան անունը
+            ).join(
+                EntityCategory, Entity.category_id == EntityCategory.id
+            ).filter(
+                Entity.word.in_(words_to_check)
+            )
+            
+            word_data = {word: (score, index) for word, score, index in word_scores_query.all()}
+
+            # 3. Հաշվարկում ենք ընդհանուր գումարը Python-ում
+            total_score_sum = 0.0
+            for word in words_to_check:
+                if word in word_data:
+                    ner_score, ner_category_index = word_data[word]
+                    
+                    ner_score = float(ner_score or 0)
+                    ner_category_index = float(ner_category_index or 0)
+                    
+                    total_score_sum += (ner_score * ner_category_index)
+            
+            return total_score_sum
+
+        except Exception as e:
+            print(f"Սխալ՝ NER-ի կարևորությունը հաշվելիս (content_id {content_id}): {e}")
+            return 0.0 # Սխալի դեպքում վերադարձնում ենք 0
+
+# Օրինակ օգտագործման համար
+if __name__ == "__main__":
+    # Այս հատվածը նույնպես պետք է թարմացվի, քանի որ այլևս երկու բազա չկա
+    # Սա պարզապես ցուցադրական օրինակ է
     
-    # Ստեղծում ենք միացումներ երկու բազաներին
-    content_conn = sqlite3.connect(content_db_path)
-    ner_conn = sqlite3.connect(ner_db_path)
+    # Ենթադրենք՝ մենք ուզում ենք ստուգել 1-ին ID-ով կոնտենտը
+    content_id_to_test = 1 
     
-    try:
-        content_cursor = content_conn.cursor()
-        ner_cursor = ner_conn.cursor()
-
-        # 1. Վերցնում ենք կոնտենտի NER բառերը `ner_results` աղյուսակից
-        content_cursor.execute("SELECT entities FROM ner_results WHERE id = ?", (content_id,))
-        result = content_cursor.fetchone()
-        
-        if not result or not result[0]:
-            return 0.0  # Եթե NER-եր չկան, վերադարձնում ենք 0
-
-        ner_entities_json = json.loads(result[0])
-        words_to_check = [entity.get("word") for entity in ner_entities_json if entity.get("word")]
-
-        # 2. Յուրաքանչյուր բառի համար փնտրում ենք գործակիցները nerdatabase.db-ում
-        for word in words_to_check:
-            # SQL հարցում, որը միացնում է entities և categories աղյուսակները
-            sql_query = """
-                SELECT
-                    e.ner_score,
-                    c.ner_class_index
-                FROM entities AS e
-                JOIN categories AS c ON e.category_id = c.id
-                WHERE e.word = ?
-            """
-            ner_cursor.execute(sql_query, (word,))
-            ner_data = ner_cursor.fetchone()
-
-            if ner_data:
-                ner_score = float(ner_data[0] or 0)
-                ner_class_index = float(ner_data[1] or 0)
-                
-                # 3. Բազմապատկում ենք գործակիցները և գումարում ընդհանուրին
-                product = ner_score * ner_class_index
-                total_score_sum += product
-
-    except Exception as e:
-        print(f"Error calculating NER importance for content_id {content_id}: {e}")
-        return 0.0 # Սխալի դեպքում վերադարձնում ենք 0
-    finally:
-        # Անպայման փակում ենք միացումները
-        content_conn.close()
-        ner_conn.close()
-        
-    return total_score_sum
+    print(f"Հաշվարկում ենք NER կարևորությունը ID={content_id_to_test}-ի համար...")
+    importance_score = calculate_ner_importance(content_id_to_test)
+    print(f"ID={content_id_to_test}-ի NER կարևորության գործակիցը՝ {importance_score}")

@@ -17,4 +17,4 @@ data/database.db
 test2.py
 test3.py
 data/content_only.json
-
+data/scrappe_dump.json

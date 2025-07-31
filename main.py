@@ -50,10 +50,19 @@ def main_blocks():
 
         print(f"{len(new_articles)} նոր հոդված հայտնաբերվեց։")
         print("----- Ավելացնում ենք նոր հոդվածները բազայում -----")
-        insert_articles_to_db(new_articles)
+        
+        # ՀԻՄՆԱԿԱՆ ՓՈՓՈԽՈՒԹՅՈՒՆԸ. Պահպանում ենք ֆունկցիայի վերադարձրած արժեքը
+        inserted_articles = insert_articles_to_db(new_articles)
+        
+        # Ստուգում ենք, արդյոք զտումից հետո հոդվածներ մնացել են
+        if not inserted_articles:
+            print("Բոլոր նոր հոդվածները բաց թողնվեցին (օր.՝ դատարկ բովանդակություն)։ Սպասում ենք հաջորդ ցիկլին...")
+            time.sleep(90)
+            continue
 
         print("----- Կատարվում է չանկավորում և պահում -----")
-        chunk_articles_and_store(new_articles)
+        # Հետագա բոլոր գործողությունների համար օգտագործում ենք զտված ցուցակը
+        chunk_articles_and_store(inserted_articles)
 
         print("----- Կատարվում է embedding-ի հաշվարկ և պահում -----")
         session = SessionLocal()
@@ -78,7 +87,8 @@ def main_blocks():
             print("Embedding-ը արդեն հաշվարկված է բոլոր չանկերի համար։")
 
         print("----- Կատարվում է Named Entity Recognition (NER) և պահում -----")
-        ner_results = run_ner_on_articles(new_articles, ner_pipeline)
+        # Այստեղ նույնպես օգտագործում ենք զտված ցուցակը
+        ner_results = run_ner_on_articles(inserted_articles, ner_pipeline)
         save_ner_results_to_db(ner_results)
         print(f"NER արդյունքները պահված են բազայում։")
 

@@ -1,6 +1,7 @@
 # composing.py
 from db import SessionLocal, Content, Parameter, Top, Processed
 import json
+import re
 from composer.llm_prompts import (
     ROLE2, OPERATIONAL_BALANCED, FORMAT_DETAILED, LANGUAGE_RUSSIAN,
     OBJECTIVITY_OPPOSITION, STYLE_DIRECT,
@@ -23,58 +24,55 @@ def format_back_context_ru(text, source=None):
     return text
 
 def prompt_gen_request_ru(base_id):
-    session = SessionLocal()
-    try:
-        # Վերցնել հիմնական կոնտենտը
-        main_news = session.query(Content.content).filter(Content.id == base_id).scalar()
+    """
+    Արդյունավետ կերպով ստեղծում է ռուսերեն պրոմպտ՝ օգտագործելով նվազագույն քանակի բազային հարցումներ։
+    """
+    with SessionLocal() as session:
+        try:
+            # 1. ԱՌԱՋԻՆ ՀԱՐՑՈՒՄ. JOIN-ի միջոցով ստանում ենք հիմնական տվյալները
+            main_data = session.query(
+                Content.content,
+                Parameter.similarity,
+                Top.geopolitical
+            ).select_from(Content) \
+             .outerjoin(Parameter, Content.id == Parameter.id) \
+             .outerjoin(Top, Content.id == Top.id) \
+             .filter(Content.id == base_id).first()
 
-        # Վերցնել similarity id-ները
-        param = session.query(Parameter.similarity).filter(Parameter.id == base_id).scalar()
-        back_contexts = []
-        if param:
-            try:
-                if isinstance(param, str):
-                    sim_list = json.loads(param)
-                elif isinstance(param, list):
-                    sim_list = param
-                else:
-                    raise ValueError("Unexpected type for param")
+            if not main_data:
+                print(f"[ERROR] Δεν βρέθηκαν δεδομένα για το base_id: {base_id}")
+                return None, None
 
-                for sim in sim_list:
-                    cid = sim.get("id")
-                    if cid:
-                        ctx_content = session.query(Content.content).filter(Content.id == cid).scalar()
-                        if ctx_content:
-                            formatted_ctx = format_back_context_ru(ctx_content)  # աղբյուր չկա
-                            if formatted_ctx:
-                                back_contexts.append(formatted_ctx)
+            main_news, similarity_data, geopolitical = main_data
+            
+            back_contexts = []
+            if similarity_data:
+                sim_ids = [sim.get("id") for sim in similarity_data if sim.get("id")]
+                if sim_ids:
+                    # 2. ԵՐԿՐՈՐԴ ՀԱՐՑՈՒՄ. Ստանում ենք բոլոր նմանատիպ հոդվածների կոնտենտը մեկ հարցումով
+                    back_context_results = session.query(Content.content).filter(Content.id.in_(sim_ids)).all()
+                    for row in back_context_results:
+                        formatted_ctx = format_back_context_ru(row[0])
+                        if formatted_ctx:
+                            back_contexts.append(formatted_ctx)
+            
+            # Պրոմպտի կառուցման տրամաբանությունը մնում է նույնը
+            prompt = ROLE2 + OPERATIONAL_BALANCED + FORMAT_DETAILED + LANGUAGE_RUSSIAN + TITLE_TELEGRAM_CHANNEL + TELEGRAM_OUTPUT_FORMAT
+            if geopolitical == "antiarmenian":
+                prompt += OBJECTIVITY_TOPIC_ADJUSTED + STYLE_REPHRASED
+            else:
+                prompt += OBJECTIVITY_OPPOSITION + STYLE_DIRECT
+            
+            content = {
+                "main_news": main_news,
+                "back_contexts": back_contexts
+            }
+            return prompt, content
 
-            except Exception as e:
-                print(f"[ERROR] Failed to process similarity data: {e}")
+        except Exception as e:
+            print(f"[ERROR] Սխալ՝ ռուսերեն պրոմպտ ստեղծելիս (base_id {base_id}): {e}")
+            return None, None
 
-        # Վերցնել geopolitical
-        geopolitical = session.query(Top.geopolitical).filter(Top.id == base_id).scalar()
-
-        # Կառուցել պրոմպտ
-        prompt = ROLE2 + OPERATIONAL_BALANCED + FORMAT_DETAILED + LANGUAGE_RUSSIAN + TITLE_TELEGRAM_CHANNEL + TELEGRAM_OUTPUT_FORMAT
-        if geopolitical == "antiarmenian":
-            prompt += OBJECTIVITY_TOPIC_ADJUSTED + STYLE_REPHRASED
-        else:
-            prompt += OBJECTIVITY_OPPOSITION + STYLE_DIRECT
-
-        # Ամբողջ բովանդակությունը
-        content = {
-            "main_news": main_news,
-            "back_contexts": back_contexts
-        }
-        return prompt, content
-
-        # Եթե ցանկանաս content-ը դարձնել մաքուր տեքստ պրոմպտի համար, փոխարինիր հետևյալով՝
-        # prompt_input = f"Main news: {main_news}\n\nContext:\n" + "\n".join([f"- {ctx}" for ctx in back_contexts])
-        # return prompt, prompt_input
-
-    finally:
-        session.close()
 
 def generate_content_with_openai_ru(prompt, content):
     client = OpenAI()
@@ -90,36 +88,40 @@ def generate_content_with_openai_ru(prompt, content):
     return completion.choices[0].message.content
 
 def save_processed_ru(base_id, openai_response):
-    import re
-    session = SessionLocal()
-    try:
-        title = ""
-        content = ""
-        # Փորձում ենք մեկ տողում գտնել
-        match = re.search(r'title:\s*"([^"]+)",\s*content:\s*"([^"]+)"', openai_response)
-        if match:
-            title = match.group(1)
-            content = match.group(2)
-        else:
-            # Փորձում ենք առանձին տողերով գտնել
-            title_match = re.search(r'title:\s*"([^"]+)"', openai_response)
-            content_match = re.search(r'content:\s*"([^"]+)"', openai_response)
-            if title_match:
-                title = title_match.group(1)
-            if content_match:
-                content = content_match.group(1)
-            if not title and not content:
-                print("[ERROR] Failed to parse OpenAI response for title/content")
-                content = openai_response  # fallback: save raw response
+    """
+    Թարմացնում է Processed աղյուսակի ռուսերեն դաշտերը։
+    """
+    with SessionLocal() as session:
+        try:
+            title_r = ""
+            content_r = ""
+            
+            # ՆՈՒՅՆ ՃԿՈՒՆ REGEX-Ը
+            pattern = r'title:\s*"(.*?)"\s*content:\s*"(.*?)"'
+            match = re.search(pattern, openai_response, re.DOTALL)
+            
+            if match:
+                title_r = match.group(1).strip()
+                content_r = match.group(2).strip()
+            else:
+                print(f"[WARNING] OpenAI-ի ռուսերեն պատասխանը չհաջողվեց մասնատել base_id={base_id}-ի համար։")
+                content_r = openai_response.strip()
 
-        # Փնտրում ենք արդեն առկա row-ը և թարմացնում տվյալները
-        existing = session.query(Processed).filter(Processed.base_id == base_id).first()
-        if existing:
-            existing.title_r = title
-            existing.generated_content_r = content
-        else:
-            processed = Processed(base_id=base_id, title_r=title, generated_content_r=content)
-            session.add(processed)
-        session.commit()
-    finally:
-        session.close()
+            existing_processed = session.query(Processed).filter(Processed.base_id == base_id).first()
+            
+            if existing_processed:
+                existing_processed.title_r = title_r
+                existing_processed.generated_content_r = content_r
+            else:
+                print(f"[WARNING] Δεν βρέθηκε εγγραφή επεξεργασμένου για το base_id={base_id}. Δημιουργείται νέα.")
+                new_processed = Processed(
+                    base_id=base_id, 
+                    title_r=title_r, 
+                    generated_content_r=content_r
+                )
+                session.add(new_processed)
+
+            session.commit()
+        except Exception as e:
+            print(f"❌ Սխալ՝ ռուսերեն մշակված կոնտենտը պահպանելիս: {e}")
+            session.rollback()

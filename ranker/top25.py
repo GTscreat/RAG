@@ -36,20 +36,28 @@ def cosine_similarity(vec1, vec2):
     return float(np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2)))
 
 def get_top_ids_with_scores(db: Session, top_n=25, similarity_threshold=0.85):
+    """
+    Ընտրում է top N թեկնածուներին՝ խուսափելով նմանատիպ և արդեն մշակված հոդվածներից։
+    """
     all_ranks = db.query(Rank).order_by(Rank.total_score.desc()).all()
-    top_ids = []
-    top_scores = []
+    
+    # Բեռնում ենք անհրաժեշտ տվյալները մեկ անգամ՝ արդյունավետության համար
+    all_params = db.query(Parameter).all()
+    param_map = {p.id: p.similarity for p in all_params if p.similarity}
+    
+    # ՀԻՄՆԱԿԱՆ ՈՒՂՂՈՒՄԸ. bytes -> numpy array փոխակերպում
+    embedding_map = {
+        p.id: np.frombuffer(p.aver_embedding, dtype=np.float32) 
+        for p in all_params if p.aver_embedding
+    }
 
-    # Load similarity links from Parameter.similarity
-    param_map = {p.id: p.similarity for p in db.query(Parameter).all() if p.similarity}
-    embedding_map = {p.id: p.aver_embedding for p in db.query(Parameter).all() if p.aver_embedding}
+    processed_rows = db.query(Processed.base_id).order_by(Processed.base_id.desc()).limit(100).all()
+    processed_base_ids = {row.base_id for row in processed_rows if row.base_id is not None}
+    processed_embeddings = [embedding_map.get(bid) for bid in processed_base_ids if embedding_map.get(bid) is not None]
 
-    # Get last 100 processed base_ids and their embeddings
-    processed_rows = db.query(Processed).order_by(Processed.id.desc()).limit(100).all()
-    processed_base_ids = [row.base_id for row in processed_rows if row.base_id is not None]
-    processed_embeddings = [embedding_map.get(bid) for bid in processed_base_ids]
-
+    # ... (is_similar և is_embedding_similar օժանդակ ֆունկցիաները մնում են նույնը) ...
     def is_similar(id1, id2):
+        # ... (անփոփոխ)
         sim_list = param_map.get(id1, [])
         for sim in sim_list:
             if sim["id"] == id2 and sim["similarity_index"] >= similarity_threshold:
@@ -59,8 +67,9 @@ def get_top_ids_with_scores(db: Session, top_n=25, similarity_threshold=0.85):
             if sim["id"] == id1 and sim["similarity_index"] >= similarity_threshold:
                 return True
         return False
-
+    
     def is_embedding_similar(id1_embedding, other_embeddings):
+        # ... (անփոփոխ)
         if id1_embedding is None:
             return False
         for emb in other_embeddings:
@@ -68,23 +77,27 @@ def get_top_ids_with_scores(db: Session, top_n=25, similarity_threshold=0.85):
                 return True
         return False
 
+    top_ids = []
+    top_scores = []
+    
     for rank in all_ranks:
-        # Skip if similar to any already selected top id
+        if rank.id in processed_base_ids:
+            continue
         if any(is_similar(rank.id, tid) for tid in top_ids):
             continue
-        # Skip if similar to any processed base_id (by similarity links)
         if any(is_similar(rank.id, pid) for pid in processed_base_ids):
             continue
-        # Skip if embedding is similar to any processed embedding
+            
         rank_embedding = embedding_map.get(rank.id)
         if is_embedding_similar(rank_embedding, processed_embeddings):
             continue
+
         top_ids.append(rank.id)
         top_scores.append(rank.total_score)
         if len(top_ids) == top_n:
             break
 
-    print(f"Top candidates after filtering: {len(top_ids)}")
+    print(f"Top թեկնածուներ ֆիլտրումից հետո: {len(top_ids)}")
     return list(zip(top_ids, top_scores))
 
 def update_top_table(db: Session, top_n=25):
@@ -133,31 +146,69 @@ def parse_openai_response(response_text):
     return results
 
 def update_top_with_ai_score(scores_dict):
-    db = SessionLocal()
-    try:
-        for id_, vals in scores_dict.items():
-            top_row = db.query(Top).filter(Top.id == id_).first()
-            if top_row:
-                top_row.ai_score = vals.get("ai_score")
-                top_row.urgency = vals.get("urgency")
-                top_row.sentiment = vals.get("sentiment")
-                top_row.geopolitical = vals.get("geopolitical")
-                if top_row.total_score and top_row.ai_score:
-                    top_row.final_score = 0.5 * top_row.total_score + 0.5 * top_row.ai_score
-        db.commit()
-    finally:
-        db.close()
+    """
+    Թարմացնում է Top աղյուսակը AI-ի կողմից տրված գնահատականներով։
+    Օգտագործում է 'with' բլոկ՝ սեսիայի ավտոմատ կառավարման համար։
+    """
+    if not scores_dict:
+        return
+        
+    with SessionLocal() as db:
+        try:
+            for id_, vals in scores_dict.items():
+                top_row = db.query(Top).filter(Top.id == id_).first()
+                if top_row:
+                    top_row.ai_score = vals.get("ai_score")
+                    top_row.urgency = vals.get("urgency")
+                    top_row.sentiment = vals.get("sentiment")
+                    top_row.geopolitical = vals.get("geopolitical")
+                    if top_row.total_score is not None and top_row.ai_score is not None:
+                        top_row.final_score = 0.5 * top_row.total_score + 0.5 * top_row.ai_score
+            db.commit()
+        except Exception as e:
+            print(f"❌ Սխալ՝ Top աղյուսակը AI գնահատականներով թարմացնելիս: {e}")
+            db.rollback()
+
 
 def refresh_top_and_score():
-    db = SessionLocal()
-    try:
-        update_top_table(db)
-        top_contents = get_top_contents(db)
-        if top_contents:
-            response_text = openai_score_stories(top_contents)
-            scores_dict = parse_openai_response(response_text)
-            update_top_with_ai_score(scores_dict)
-            return scores_dict
-        return None
-    finally:
-        db.close()
+    """
+    Հիմնական ֆունկցիա, որը համակարգում է ամբողջ գործընթացը՝ 
+    top ընտրելուց մինչև AI-ով գնահատելը։
+    """
+    with SessionLocal() as db:
+        try:
+            # Թարմացնում ենք Top աղյուսակը top թեկնածուներով
+            top_candidates = get_top_ids_with_scores(db)
+            db.query(Top).delete()
+            db.flush() # Համոզվում ենք, որ delete-ը կատարվել է commit-ից առաջ
+            for id_, score in top_candidates:
+                db.add(Top(id=id_, total_score=score))
+            
+            # Ստանում ենք նոր top-ի կոնտենտը OpenAI-ին ուղարկելու համար
+            top_contents = get_top_contents(db)
+            
+            if top_contents:
+                response_text = openai_score_stories(top_contents)
+                scores_dict = parse_openai_response(response_text)
+                
+                # Թարմացնում ենք նույն սեսիայի մեջ AI գնահատականները
+                for id_, vals in scores_dict.items():
+                    top_row = db.query(Top).filter(Top.id == id_).first()
+                    if top_row:
+                        top_row.ai_score = vals.get("ai_score")
+                        top_row.urgency = vals.get("urgency")
+                        top_row.sentiment = vals.get("sentiment")
+                        top_row.geopolitical = vals.get("geopolitical")
+                        if top_row.total_score is not None and top_row.ai_score is not None:
+                            top_row.final_score = 0.5 * top_row.total_score + 0.5 * top_row.ai_score
+                
+                db.commit() # Ամբողջ գործարքը հաստատում ենք մեկ անգամ
+                return scores_dict
+            
+            db.commit() # Հաստատում ենք, եթե նույնիսկ top_contents չկար
+            return None
+            
+        except Exception as e:
+            print(f"❌ Սխալ՝ refresh_top_and_score-ի ընթացքում: {e}")
+            db.rollback()
+            return None

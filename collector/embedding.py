@@ -24,38 +24,48 @@ def embed_chunks(
     If save_mode == "bulk", returns embeddings as list (for external save).
     If save_mode == "update", embeddings are written directly to DB.
     """
-    # --- 1. Input normalization
     if not chunks:
         return []
 
-    # If input is list of strings, convert to list of dicts with 'chunk_content'
-    if isinstance(chunks[0], str):
+    is_list_of_strings = isinstance(chunks[0], str)
+    if is_list_of_strings:
+        original_texts = list(chunks)
         chunks = [{"chunk_content": s} for s in chunks]
-
-    texts = [f"{prefix}{chunk['chunk_content']}" for chunk in chunks]
-    embeddings = model.encode(
-        texts,
+    
+    texts_to_embed = [f"{prefix}{chunk['chunk_content']}" for chunk in chunks]
+    
+    # model.encode-ը վերադարձնում է NumPy զանգված
+    embeddings_array = model.encode(
+        texts_to_embed,
         batch_size=batch_size,
         show_progress_bar=True,
         normalize_embeddings=True
     )
-    if isinstance(embeddings, np.ndarray):
-        embeddings = embeddings.tolist()
+
+    # Եթե save_mode-ը "update" է, պահպանում ենք բազայում
+    if save_mode == "update":
+        # Օգտագործում ենք 'with'՝ ավելի հուսալի սեսիայի կառավարման համար
+        with SessionLocal() as session:
+            try:
+                for i, chunk in enumerate(chunks):
+                    db_obj = session.query(Embedding).filter(Embedding.id == chunk["id"]).first()
+                    if db_obj:
+                        # Փոխակերպում ենք embedding-ը list-ի փոխարեն bytes-ի
+                        db_obj.embedding = embeddings_array[i].tobytes()
+                
+                session.commit()
+            except Exception as e:
+                print(f"❌ Սխալ տեղի ունեցավ embedding-ները պահպանելիս: {e}")
+                session.rollback()
+
+    # Bulk ռեժիմի կամ վերադարձվող արժեքի համար պատրաստում ենք արդյունքները
     results = []
-    for chunk, emb in zip(chunks, embeddings):
+    for i, chunk in enumerate(chunks):
         result = dict(chunk)
-        result["embedding"] = emb
+        # Վերադարձվող արժեքը կարող է լինել list
+        result["embedding"] = embeddings_array[i].tolist()
         results.append(result)
 
-    if save_mode == "update":
-        session = SessionLocal()
-        for chunk, emb in zip(chunks, embeddings):
-            db_obj = session.query(Embedding).filter_by(id=chunk["id"]).first()
-            if db_obj:
-                db_obj.embedding = emb
-        session.commit()
-        session.close()
-    # bulk mode just returns the results (you can save them elsewhere)
     return results
 
 def embed_query(query: str) -> np.ndarray:

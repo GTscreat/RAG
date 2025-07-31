@@ -109,79 +109,79 @@ def get_urgent_value(path='spreader/selector_urgent_value.txt'):
         return 0
 
 def publishing_cycle():
-    db = SessionLocal()
-    try:
-        row = db.query(Processed).filter(Processed.published == "publish").first()
-        if row:
-            print(f"[INFO] Found content to publish. base_id={row.base_id}")
-            # Fetch url from Content table
-            url = ""
-            content_row = db.query(Content).filter(Content.id == row.base_id).first()
-            if content_row and content_row.url:
-                url = content_row.url
+    # Սահմանում ենք լռելյայն արժեք
+    sleep_time = 6 * 60  
+    
+    with SessionLocal() as db:
+        try:
+            row = db.query(Processed).filter(Processed.published == "publish").first()
+            if row:
+                print(f"[INFO] Found content to publish. base_id={row.base_id}")
+                content_row = db.query(Content).filter(Content.id == row.base_id).first()
+                url = content_row.url if content_row and content_row.url else "https://t.me/newsarmaipowerd"
+                image_url = get_image_url(db, row.base_id)
+                message = format_telegram_message(row.title or "", row.generated_content or "", url)
+                
+                success = asyncio.run(publish_to_telegram(message, image_url))
+                
+                if success:
+                    row.published = "published"
+                    db.commit()
+                    print(f"[INFO] Marked base_id={row.base_id} as published.")
+                else:
+                    print(f"[INFO] Publishing failed. base_id={row.base_id} not marked as published.")
             else:
-                url = "https://t.me/newsarmaipowerd"  # fallback or default
+                print("[INFO] No content with published='publish' found.")
 
-            # Ստանալ image url
-            image_url = get_image_url(db, row.base_id)
-
-            message = format_telegram_message(row.title or "", row.generated_content or "", url)
-            success = asyncio.run(publish_to_telegram(message, image_url))
-            if success:
-                row.published = "published"
-                db.commit()
-                print(f"[INFO] Marked base_id={row.base_id} as published.")
+            # sleep_time-ի հաշվարկի տրամաբանությունը մնում է նույնը
+            not_published_count = db.query(Processed).filter(
+                or_(Processed.published != "published", Processed.published.is_(None))
+            ).count()
+            
+            urgent = get_urgent_value()
+            
+            if urgent > 1:
+                sleep_time = 2 * 60
+            elif urgent <= 1 and not_published_count > 12:
+                sleep_time = 3 * 60
+            elif urgent <= 1 and not_published_count > 8:
+                sleep_time = 4 * 60
+            elif urgent <= 1 and not_published_count > 5:
+                sleep_time = 5 * 60
             else:
-                print(f"[INFO] Publishing failed. base_id={row.base_id} not marked as published.")
-        else:
-            print("[INFO] No content with published='publish' found.")
+                sleep_time = 6 * 60
 
-        not_published_count = db.query(Processed).filter(
-            or_(
-                Processed.published != "published",
-                Processed.published.is_(None)
-            )
-        ).count()
-        print(f"[DEBUG] Not published count: {not_published_count}")
+            print(f"[INFO] Next cycle in {sleep_time // 60} minutes.")
+            
+        except Exception as e:
+            print(f"❌ Սխալ՝ հրապարակման ցիկլի ընթացքում: {e}")
+            db.rollback()
 
-        urgent = get_urgent_value()
-        print(f"[DEBUG] Urgent value: {urgent}")
-
-        if urgent > 1:
-            sleep_time = 2 * 60
-        elif urgent <= 1 and not_published_count > 12:
-            sleep_time = 3 * 60
-        elif urgent <= 1 and not_published_count > 8:
-            sleep_time = 4 * 60
-        elif urgent <= 1 and not_published_count > 5:
-            sleep_time = 5 * 60
-        else:
-            sleep_time = 6 * 60
-
-        print(f"[INFO] Next cycle in {sleep_time // 60} minutes.")
-    finally:
-        db.close()
     return sleep_time
 
+
 def publishing_cycle_ru():
-    db = SessionLocal()
-    try:
-        row = db.query(Processed).filter(Processed.published_r == "publish").first()
-        if row:
-            print(f"[INFO] Found RU content to publish. base_id={row.base_id}")
-            # Fetch url and image as in Armenian block
-            content_row = db.query(Content).filter(Content.id == row.base_id).first()
-            url = content_row.url if content_row and content_row.url else "https://t.me/newsrusaipowerd"
-            image_url = get_image_url(db, row.base_id)
-            message_ru = format_telegram_message_ru(row.title_r or "", row.generated_content_r or "", url)
-            success = asyncio.run(publish_to_telegram_ru(message_ru, image_url))
-            if success:
-                row.published_r = "published"
-                db.commit()
-                print(f"[INFO] Marked base_id={row.base_id} as published_r.")
+    with SessionLocal() as db:
+        try:
+            row = db.query(Processed).filter(Processed.published_r == "publish").first()
+            if row:
+                print(f"[INFO] Found RU content to publish. base_id={row.base_id}")
+                content_row = db.query(Content).filter(Content.id == row.base_id).first()
+                url = content_row.url if content_row and content_row.url else "https://t.me/newsrusaipowerd"
+                image_url = get_image_url(db, row.base_id)
+                
+                message_ru = format_telegram_message_ru(row.title_r or "", row.generated_content_r or "", url)
+                success = asyncio.run(publish_to_telegram_ru(message_ru, image_url))
+                
+                if success:
+                    row.published_r = "published"
+                    db.commit()
+                    print(f"[INFO] Marked base_id={row.base_id} as published_r.")
+                else:
+                    print(f"[INFO] Publishing RU failed. base_id={row.base_id} not marked as published_r.")
             else:
-                print(f"[INFO] Publishing RU failed. base_id={row.base_id} not marked as published_r.")
-        else:
-            print("[INFO] No RU content with published_r='publish' found.")
-    finally:
-        db.close()
+                print("[INFO] No RU content with published_r='publish' found.")
+        
+        except Exception as e:
+            print(f"❌ Սխալ՝ ռուսերեն հրապարակման ցիկլի ընթացքում: {e}")
+            db.rollback()

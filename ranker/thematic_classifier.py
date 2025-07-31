@@ -41,26 +41,47 @@ def classify_topic_article(chunks_embeddings, thematic_embeddings, threshold=0.7
         return "այլ"
 
 def run_thematic_classifier():
+    print("Թեմատիկ դասակարգչի գործարկում...")
     thematic_embeddings = load_thematic_embeddings()
-    session = SessionLocal()
-    # Բեռնում ենք բոլոր embeddings-ը՝ id-ով խմբավորած
-    all_embeddings = session.query(Embedding).all()
-    article_embeddings_map = defaultdict(list)
-    for chunk in all_embeddings:
-        article_embeddings_map[chunk.article_id].append(chunk.embedding)
-    # Յուրաքանչյուր հոդվածի համար դասակարգում ենք թեման
-    updated, missed = 0, 0
-    for art_id, chunk_embs in article_embeddings_map.items():
-        topic = classify_topic_article(chunk_embs, thematic_embeddings)
-        # Թարմացնում ենք Parameter աղյուսակում տվյալ հոդվածի category դաշտը
-        param = session.query(Parameter).filter_by(id=art_id).first()
-        if param:
-            param.category = topic
-            updated += 1
-        else:
-            # Եթե չկա, կարող ես ավելացնել, կամ բաց թողնել
-            session.add(Parameter(id=art_id, category=topic, aver_embedding=None, similarity=None))
-            missed += 1
-    session.commit()
-    session.close()
-    print(f"Թեմատիկ դասակարգում. Թարմացվեց {updated} | Նոր ավելացվեց {missed}")
+
+    # 'with' բլոկ՝ սեսիայի անվտանգ և ավտոմատ կառավարման համար
+    with SessionLocal() as session:
+        try:
+            # Զգուշացում. մեծ բազաների դեպքում սա դանդաղ է աշխատելու
+            # Բեռնում ենք միայն անհրաժեშտ դաշտերը՝ արդյունավետության համար
+            all_embeddings_data = session.query(Embedding.article_id, Embedding.embedding).filter(Embedding.embedding != None).all()
+            
+            article_embeddings_map = defaultdict(list)
+            for article_id, emb_bytes in all_embeddings_data:
+                # ՀԻՄՆԱԿԱՆ ՈՒՂՂՈՒՄԸ. bytes -> numpy array փոխակերպում
+                numpy_emb = np.frombuffer(emb_bytes, dtype=np.float32)
+                article_embeddings_map[article_id].append(numpy_emb)
+
+            updated_count, new_count = 0, 0
+            
+            # Հավաքում ենք բոլոր թարմացումները՝ մեկ հարցումով դրանք կատարելու համար
+            updates_to_process = []
+            for art_id, chunk_embs in article_embeddings_map.items():
+                # Այժմ այս ֆունկցիան ստանում է NumPy զանգվածների ցուցակ, ինչպես որ պետք է
+                topic = classify_topic_article(chunk_embs, thematic_embeddings)
+                updates_to_process.append({'id': art_id, 'category': topic})
+
+            # Արդյունավետ կերպով թարմացնում ենք բոլոր պարամետրները
+            for update_data in updates_to_process:
+                # session.merge()-ը կթարմացնի օբյեկտը, եթե այն գոյություն ունի,
+                # կամ կստեղծի նորը, եթե այն ավելացվի սեսիայի մեջ։
+                param = session.query(Parameter).filter(Parameter.id == update_data['id']).first()
+                if param:
+                    param.category = update_data['category']
+                    updated_count += 1
+                else:
+                    # Եթե չկա, ստեղծում ենք նորը
+                    session.add(Parameter(id=update_data['id'], category=update_data['category']))
+                    new_count += 1
+            
+            session.commit()
+            print(f"✅ Թեմատիկ դասակարգում. Թարմացվեց {updated_count} | Նոր ավելացվեց {new_count}")
+
+        except Exception as e:
+            print(f"❌ Սխալ՝ թեմատիկ դասակարգման ժամանակ: {e}")
+            session.rollback()

@@ -1,6 +1,6 @@
 import json
 import os
-from db import SessionLocal, Content, Parameter, Embedding, NERResult, NERRating, Rank
+from db import SessionLocal, Content, Parameter, Embedding, NERResult, Rank
 from ranker.calculate_ner_importance import calculate_ner_importance
 import math
 
@@ -18,9 +18,9 @@ MIN_FREQ = 0.0         # Similarity գումարի min, նորմալիզացիա
 MAX_FREQ = 3.0         # Similarity գումարի max, նորմալիզացիայի համար
 
 # --- Կշիռներ (պետական կարևորության scoring) ---
-THEMATIC_W = 0.3
-NER_W = 0.3
-FREQ_W = 0.3
+THEMATIC_W = 0.25
+NER_W = 0.32
+FREQ_W = 0.28
 SOURCE_W = 0.15
 
 
@@ -119,7 +119,7 @@ def rank_news():
                 thematic_score = sum(scores_found) / len(scores_found)
 
         # 2. NER կարևորություն (հիմնված նոր տրամաբանության վրա)
-        ner_sum_of_products = calculate_ner_importance(id_, CONTENT_DB_PATH, NER_DB_PATH)
+        ner_sum_of_products = calculate_ner_importance(id_)
         ner_score = normalize_log(ner_sum_of_products, 1, 5) # Օգտագործում ենք լոգարիթմական նորմալիզացիան
 
         # 3. Frequency (similarity գումար)
