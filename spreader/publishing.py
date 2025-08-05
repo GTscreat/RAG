@@ -9,6 +9,17 @@ import json
 
 load_dotenv()
 
+WEBSITE_ID_MAP = {
+    1: "news.am",
+    2: "armenpress.am",
+    3: "armtimes.com",
+    4: "hraparak.am",
+    5: "1lurer.am",
+    6: "arm.sputniknews.ru",
+    9: "t.me/s/rian_ru",
+    # Ավելացրեք մյուսները ըստ անհրաժեշտության...
+}
+
 TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
 TELEGRAM_CHANNEL_ID = '@newsarmaipowerd'
 TELEGRAM_BOT_TOKEN_RU = os.getenv('TELEGRAM_BOT_TOKEN_RU')
@@ -75,31 +86,56 @@ async def publish_to_telegram_ru(text, image_url=None):
 
 def get_image_url(db, base_id):
     content_row = db.query(Content).filter(Content.id == base_id).first()
-    if content_row and content_row.meta:
-        meta = content_row.meta
-        # Եթե meta-ն str է, վերծանիր, եթե dict է՝ օգտագործիր անմիջապես
-        if isinstance(meta, str):
-            import json
-            try:
-                meta = json.loads(meta)
-            except Exception as e:
-                print(f"[ERROR] Failed to parse meta: {e}")
-                return None
-        image_path = meta.get("image")
-        website = content_row.website if content_row and content_row.website else ""
-        if image_path and website:
-            # Բացառություն՝ եթե image_path-ը արդեն լիարժեք հղում է
-            if image_path.startswith("https://cdn.am.sputniknews.ru"):
-                image_url = image_path
-            elif image_path.startswith("//armenpress.am"):
-                image_url = f"https:{image_path}"
-            elif website.startswith("http"):
-                image_url = f"{website.rstrip('/')}/{image_path.lstrip('/')}"
-            else:
-                image_url = f"https://{website.rstrip('/')}/{image_path.lstrip('/')}"
-                print(image_url)
-            return image_url
-    return None
+
+    if not content_row:
+        print(f"[DEBUG] get_image_url: Content տողը base_id={base_id}-ի համար չի գտնվել։")
+        return None
+    
+    if not content_row.meta:
+        print(f"[DEBUG] get_image_url: Content տողը base_id={base_id}-ի համար չունի 'meta' դաշտ։")
+        return None
+
+    meta = content_row.meta
+    if isinstance(meta, str):
+        try:
+            meta = json.loads(meta)
+        except Exception as e:
+            print(f"[DEBUG][ERROR] get_image_url: Meta JSON-ի վերծանումը ձախողվեց։ Սխալ՝ {e}")
+            return None
+
+    image_path = meta.get("image")
+    website_id = content_row.website_id
+    website_url = WEBSITE_ID_MAP.get(website_id)
+
+    if image_path and website_url:
+        final_image_url = None
+        # === Վերականգնում ենք հին, ճիշտ աշխատող տրամաբանությունը ===
+
+        # Դեպք 1: image_path-ը լիարժեք CDN հղում է (Sputnik)
+        if image_path.startswith("https://cdn.am.sputniknews.ru"):
+            final_image_url = image_path
+            print(f"[DEBUG] get_image_url: Դեպք 1 (Sputnik CDN)։ Վերջնական URL՝ {final_image_url}")
+
+        # Դեպք 2: image_path-ը պրոտոկոլից անկախ հղում է (Armenpress)
+        elif image_path.startswith("//armenpress.am"):
+            final_image_url = f"https:{image_path}"
+            print(f"[DEBUG] get_image_url: Դեպք 2 (Armenpress)։ Վերջնական URL՝ {final_image_url}")
+
+        # Դեպք 3: Կայքի URL-ը արդեն պարունակում է http (լիարժեք հասցե)
+        elif website_url.startswith("http"):
+            final_image_url = f"{website_url.rstrip('/')}/{image_path.lstrip('/')}"
+            print(f"[DEBUG] get_image_url: Դեպք 3 (http)։ Վերջնական URL՝ {final_image_url}")
+
+        # Դեպք 4: Լռելյայն դեպք (կայքի URL-ը միայն դոմենն է)
+        else:
+            final_image_url = f"https://{website_url.rstrip('/')}/{image_path.lstrip('/')}"
+            print(f"[DEBUG] get_image_url: Դեպք 4 (Default)։ Վերջնական URL՝ {final_image_url}")
+        
+        return final_image_url
+    
+    else:
+        print(f"[DEBUG] get_image_url: image_path-ը կամ website_url-ը բացակայում է, վերադարձնում ենք None։")
+        return None
 
 def get_urgent_value(path='spreader/selector_urgent_value.txt'):
     try:

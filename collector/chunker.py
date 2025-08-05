@@ -2,16 +2,15 @@ from db import SessionLocal, Embedding  # Քո db.py-ից ներմուծում
 
 def chunk_articles_and_store(articles, max_chunk_size=512, overlap_size=256):
     """
-    articles: list of dicts (content աղյուսակի օրինակով)
+    articles: list of SQLAlchemy Content objects
     Չանկերը անմիջապես ավելացնում է տվյալների բազայի Embedding աղյուսակում։
     """
-    # Օգտագործում ենք 'with'՝ սեսիայի ավտոմատ և անվտանգ փակման համար
     with SessionLocal() as session:
         chunk_count = 0
         try:
             for article in articles:
-                content = article.get("content", "")
-                # Բաց թողնում ենք դատարկ կոնտենտով հոդվածները
+                # ՈՒՂՂՈՒՄ. article.get("content", "") -> article.content
+                content = article.content or ""
                 if not content:
                     continue
 
@@ -20,15 +19,9 @@ def chunk_articles_and_store(articles, max_chunk_size=512, overlap_size=256):
                     end = min(start + max_chunk_size, len(content))
                     chunk_text = content[start:end]
                     
-                    # Ձեր տրամաբանությունն այստեղ արդեն ճիշտ է
                     chunk = Embedding(
-                        # id-ն բաց է թողնված, PostgreSQL-ը կգեներացնի այն
-                        article_id=article.get("id"),
-                        website=article.get("website"),
-                        title=article.get("title"),
-                        published_at=article.get("published_at"),
-                        url=article.get("url"),
-                        meta=article.get("meta"),
+                        # ՈՒՂՂՈՒՄ. article.get("id") -> article.id
+                        article_id=article.id,
                         chunk_content=chunk_text,
                         chunk_start=start,
                         chunk_end=end,
@@ -37,15 +30,12 @@ def chunk_articles_and_store(articles, max_chunk_size=512, overlap_size=256):
                     session.add(chunk)
                     chunk_count += 1
 
-                    # Եթե հասել ենք տեքստի վերջին, դադարեցնում ենք ցիկլը
                     if end == len(content):
                         break
                     
-                    # Հաշվարկում ենք հաջորդ մեկնարկային կետը՝ համընկնումը (overlap) հաշվի առնելով
                     new_start = end - overlap_size
-                    # Երաշխավորում ենք, որ ցիկլը անվերջ չի լինի
                     start = new_start if new_start > start else end
-
+            
             session.commit()
             print(f"✅ Ընդհանուր ավելացված չանկեր: {chunk_count}")
         
@@ -57,7 +47,6 @@ def chunk_articles_and_store(articles, max_chunk_size=512, overlap_size=256):
 if __name__ == "__main__":
     sample_article = [{
         "id": 1,
-        "website": "news.am",
         "title": "Օրինակի հոդվածի վերնագիր",
         "published_at": "2025-06-24 13:30:12",
         "content": "Սա շատ երկար օրինակ տեքստ է, որը մենք կօգտագործենք հայերեն չանկերի փորձարկման համար։ " * 50,

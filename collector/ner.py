@@ -1,6 +1,6 @@
 import numpy as np
 from transformers import pipeline, AutoTokenizer, AutoModelForTokenClassification
-from db import SessionLocal, NERResult, Entity # Փոխվել է ներմուծումը
+from db import SessionLocal, Parameter, Entity
 
 def load_ner_pipeline():
     # ... (Այս ֆունկցիան մնում է անփոփոխ)
@@ -29,17 +29,24 @@ def merge_entities(entities, group_key="entity_group", word_key="word", start_ke
     return merged
 
 def run_ner_on_articles(articles, ner_pipeline):
-    # ... (Այս ֆունկցիան մնում է անփոփոխ)
     results = []
     for article in articles:
-        text = article.get("title", "") + "\n" + article.get("content", "")
+        # ՈՒՂՂՈՒՄ. article.get("title", "") -> article.title
+        # ՈՒՂՂՈՒՄ. article.get("content", "") -> article.content
+        title_text = article.title or ""
+        content_text = article.content or ""
+        
+        text = title_text + "\n" + content_text
         entities = ner_pipeline(text)
         entities = merge_entities(entities)
+        
+        # ՈՒՂՂՈՒՄ. article["id"] -> article.id
         results.append({
-            "id": article["id"],
+            "id": article.id,
             "entities": entities
         })
     return results
+
 
 def to_python_type(obj):
     # ... (Այս ֆունկցիան մնում է անփոփոխ)
@@ -52,39 +59,33 @@ def to_python_type(obj):
     else:
         return obj
 
-# =============================================================
-# === ԱՄԲՈՂՋՈՒԹՅԱՄԲ ԹԱՐՄԱՑՎԱԾ ՖՈՒՆԿՑԻԱ ===
-# =============================================================
 def save_ner_results_to_db(results):
     """
-    Պահպանում է NER արդյունքները և ավելացնում է նոր, եզակի էնթիթիները։
+    Պահպանում է NER արդյունքները Parameter աղյուսակում և ավելացնում է
+    նոր, եզակի էնթիթիները Entities աղյուսակում՝ մեկ գործարքի շրջանակում։
     """
     if not results:
         return
 
     with SessionLocal() as session:
         try:
-            # ... (Մաս 1-ը մնում է նույնը) ...
-            count_new_results, count_updated_results = 0, 0
+            # --- Մաս 1: NER արդյունքների պահպանում Parameter աղյուսակում ---
             for item in results:
                 article_id = item["id"]
                 entities_json = to_python_type(item["entities"])
-                exists = session.query(NERResult).filter(NERResult.id == article_id).first()
-                if exists:
-                    exists.entities = entities_json
-                    count_updated_results += 1
-                else:
-                    session.add(NERResult(id=article_id, entities=entities_json))
-                    count_new_results += 1
-            print(f"✅ NER արդյունքներ: Նոր՝ {count_new_results} | Թարմացված՝ {count_updated_results}")
+                
+                # session.merge()-ը կստեղծի Parameter տող, եթե այն չկա,
+                # կամ կթարմացնի գոյություն ունեցողը։
+                session.merge(Parameter(id=article_id, entities=entities_json))
+            
+            print(f"✅ {len(results)} NER արդյունք պահպանվեց/թարմացվեց Parameter աղյուսակում։")
 
-            # --- Մաս 2: Նոր էնթիթիների ավելացում Entities աղյուսակում ---
+            # --- Մաս 2: Նոր էնթիթիների ավելացում Entities աղյուսակում (մնում է նույնը) ---
             word_to_entity_data = {}
             for item in results:
                 for ent in item.get("entities", []):
                     word = ent.get("word")
                     if word and word not in word_to_entity_data:
-                        # ՀԻՄՆԱԿԱՆ ՈՒՂՂՈՒՄԸ. Ամբողջ entity dict-ը մշակում ենք to_python_type-ով
                         word_to_entity_data[word] = to_python_type(ent)
 
             all_words_from_ner = set(word_to_entity_data.keys())
@@ -100,14 +101,11 @@ def save_ner_results_to_db(results):
             for word in new_words_to_add:
                 entity_data = word_to_entity_data[word]
                 new_entity = Entity(
-                    word=word,
-                    entity_group=entity_data.get('entity_group'),
-                    score=entity_data.get('score'), # Այժմ սա սովորական float է
-                    ner_score=None,
-                    category_id=None
+                    word=word, entity_group=entity_data.get('entity_group'),
+                    score=entity_data.get('score'), ner_score=None, category_id=None
                 )
                 session.add(new_entity)
-            
+
             session.commit()
             print(f"✅ {len(new_words_to_add)} նոր էնթիթի ավելացվեց entities աղյուսակում։")
 

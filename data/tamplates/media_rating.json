@@ -1,6 +1,6 @@
 [
-    {"url": "armenpress.am", "score": 5},
-    {"url": "news.am", "score": 5},
+    {"url": "armenpress.am", "score": 5, "website_id": 2},
+    {"url": "news.am", "score": 5, "website_id": 1},
     {"url": "azatutyun.am", "score": 5},
     {"url": "tert.am", "score": 5},
     {"url": "hetq.am", "score": 5},

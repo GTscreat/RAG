@@ -1,99 +1,133 @@
-import re
-import json
-import numpy as np
-from transformers import pipeline, AutoTokenizer, AutoModelForTokenClassification
-from sqlalchemy import create_engine, Column, Integer, String, Float
-from sqlalchemy.orm import sessionmaker, declarative_base
-import torch
-from tqdm import tqdm  # Պրոգրեսի սանդղակի համար
+import sqlite3
+import psycopg2
+import sys
+from datetime import datetime # Ավելացնում ենք datetime գրադարանը
 
-# Նոր տվյալների բազայի ինտեգրում
-NER_DATABASE_URL = "sqlite:///./data/nerdatabase.db"
-engine = create_engine(NER_DATABASE_URL, connect_args={"check_same_thread": False})
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-Base = declarative_base()
+# --- ԿՈՆՖԻԳՈՒՐԱՑԻԱ ---
+# Փոխարինեք այս տվյալները ձեր սեփական տվյալներով
 
-# Նոր աղյուսակի սահմանում
-class NEREntity(Base):
-    __tablename__ = "ner_entities"
-    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    entity_group = Column(String, nullable=False)
-    score = Column(Float, nullable=False)
-    word = Column(String, nullable=False)
+# 1. SQLite բազայի ֆայլի ճանապարհը
+sqlite_db_path = 'RAG_old_version/data/database.db'
 
-# Տվյալների բազայի ստեղծում
-Base.metadata.create_all(bind=engine)
+# 2. PostgreSQL բազայի միացման տվյալները
+pg_config = {
+    'dbname': 'Dpir_database',
+    'user': 'postgres',
+    'password': 'Aylabanutyun1991',
+    'host': 'localhost',
+    'port': '5432'
+}
 
-def load_ner_pipeline():
-    """
-    Բեռնում է NER մոդելը և tokenizer-ը։
-    """
-    model_name = "daviddallakyan2005/armenian-ner"
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
-    model = AutoModelForTokenClassification.from_pretrained(model_name)
-    device = "cuda" if torch.cuda.is_available() else "cpu"  # Օգտագործել GPU, եթե հասանելի է
-    model = model.to(device)  # Մոդելը տեղափոխել GPU կամ CPU
-    ner_pipeline = pipeline("ner", model=model, tokenizer=tokenizer, aggregation_strategy="simple", device=0 if torch.cuda.is_available() else -1)
-    return ner_pipeline
+# 3. Աղյուսակի և սյունակի անունները
+table_name = 'content'
+datetime_column_name = 'published_at'
 
-def merge_entities(entities, group_key="entity_group", word_key="word", start_key="start", end_key="end", score_key="score"):
-    """
-    Միավորում է NER արդյունքները՝ նույն խմբի և հարակից բառերը միավորելով։
-    """
-    if not entities:
-        return []
-    merged = []
-    entities = sorted(entities, key=lambda x: x[start_key])
-    buffer = entities[0].copy()
-    for ent in entities[1:]:
-        if ent[group_key] == buffer[group_key] and ent[start_key] == buffer[end_key]:
-            buffer[word_key] += ent[word_key]
-            buffer[end_key] = ent[end_key]
-            buffer[score_key] = max(buffer[score_key], ent[score_key])
-        else:
-            merged.append(buffer)
-            buffer = ent.copy()
-    merged.append(buffer)
-    return merged
+# 4. SQLite-ի ամսաթվի ֆորմատը
+SQLITE_DATETIME_FORMAT = '%Y-%m-%d %H:%M:%S'
 
-def process_and_save_article(article, ner_pipeline, session, existing_words):
-    """
-    Մշակում է մեկ հոդված և պահպանում է դրա NER արդյունքները տվյալների բազայում։
-    """
-    text = article  # Քանի որ article-ը տող է, այն ուղղակի օգտագործվում է որպես տեքստ
-    ner_results = ner_pipeline(text)
-    merged_entities = merge_entities(ner_results)
-    new_entities_count = 0
+# 5. Սյունակներ, որոնք պետք է բաց թողնել տեղափոխման ժամանակ
+EXCLUDED_COLUMNS = ['website'] 
 
-    for entity in merged_entities:
-        if entity["word"] not in existing_words:  # Ստուգել, արդյոք word-ն արդեն կա
-            ner_entity = NEREntity(
-                entity_group=entity["entity_group"],
-                score=entity["score"],
-                word=entity["word"]
-            )
-            session.add(ner_entity)
-            existing_words.add(entity["word"])  # Ավելացնել նոր word-ը հավաքածուին
-            new_entities_count += 1
+# 6. (ՆՈՐ) Սյունակներ, որոնք պետք է ավելացվեն ֆիքսված արժեքով
+# Օգտակար է, երբ Postgres-ի աղյուսակն ունի NOT NULL սյունակ, որը չկա SQLite-ում
+DEFAULT_VALUES = {
+    'website_id': 1
+}
 
-    return new_entities_count
 
-if __name__ == "__main__":
-    # Կարդալ JSON ֆայլը
-    with open("data/content_only.json", "r", encoding="utf-8") as f:
-        articles = json.load(f)
-    print(f"Կարդացվեց {len(articles)} հոդված")
+# --- ՍԿՐԻՊՏԻ ՏՐԱՄԱԲԱՆՈՒԹՅՈՒՆԸ ---
 
-    # Ներբեռնել NER pipeline-ը
-    ner_pipeline = load_ner_pipeline()
+def migrate_data():
+    sqlite_conn = None
+    postgres_conn = None
+    
+    try:
+        # Միացումներ բազաներին
+        print("Connecting to databases...")
+        sqlite_conn = sqlite3.connect(sqlite_db_path)
+        sqlite_cursor = sqlite_conn.cursor()
+        postgres_conn = psycopg2.connect(**pg_config)
+        postgres_cursor = postgres_conn.cursor()
+        
+        # 1. Ստանալ տվյալները SQLite-ից
+        print(f"Fetching data from SQLite table '{table_name}'...")
+        sqlite_cursor.execute(f"SELECT * FROM {table_name}")
+        
+        source_column_names = [description[0] for description in sqlite_cursor.description]
+        all_rows = sqlite_cursor.fetchall()
 
-    # Սկսել սեսիան
-    session = SessionLocal()
-    existing_words = {row.word for row in session.query(NEREntity.word).all()}  # Գոյություն ունեցող բառերի հավաքածու
+        if not all_rows:
+            print("No data found in the source table. Exiting.")
+            return
 
-    for article in tqdm(articles, desc="Մշակվում են հոդվածները"):
-        process_and_save_article(article, ner_pipeline, session, existing_words)
+        print(f"Fetched {len(all_rows)} rows from SQLite.")
+        
+        # 2. Ֆիլտրում և պատրաստում ենք սյունակների ցանկը
+        print(f"Excluding columns: {', '.join(EXCLUDED_COLUMNS)}")
+        target_column_names = [col for col in source_column_names if col not in EXCLUDED_COLUMNS]
+        indices_to_keep = [source_column_names.index(col) for col in target_column_names]
+        
+        # Ավելացնում ենք ֆիքսված արժեքով սյունակների անունները
+        if DEFAULT_VALUES:
+            target_column_names.extend(DEFAULT_VALUES.keys())
 
-    session.commit()
-    session.close()
-    print(f"NER արդյունքները հաջողությամբ պահպանվեցին տվյալների բազայում։")
+        print(f"Final columns for insertion: {', '.join(target_column_names)}")
+
+        # 3. Մշակում ենք յուրաքանչյուր տողը
+        processed_rows = []
+        
+        dt_column_index_in_target = -1
+        if datetime_column_name in target_column_names:
+            dt_column_index_in_target = target_column_names.index(datetime_column_name)
+
+        for row in all_rows:
+            # Ստեղծում ենք նոր տող՝ միայն պահպանվող սյունակների տվյալներով
+            filtered_row_list = [row[i] for i in indices_to_keep]
+            
+            # Մշակում ենք ամսաթիվը, եթե այն առկա է
+            if dt_column_index_in_target != -1:
+                date_string = filtered_row_list[dt_column_index_in_target]
+                
+                if date_string and isinstance(date_string, str):
+                    try:
+                        datetime_object = datetime.strptime(date_string, SQLITE_DATETIME_FORMAT)
+                        filtered_row_list[dt_column_index_in_target] = datetime_object
+                    except ValueError:
+                        filtered_row_list[dt_column_index_in_target] = None
+                else:
+                    filtered_row_list[dt_column_index_in_target] = None
+            
+            # Ավելացնում ենք ֆիքսված արժեքները տողի վերջում
+            if DEFAULT_VALUES:
+                filtered_row_list.extend(DEFAULT_VALUES.values())
+
+            processed_rows.append(tuple(filtered_row_list))
+
+        # 4. Ներմուծել տվյալները PostgreSQL
+        print(f"Inserting data into PostgreSQL table '{table_name}'...")
+        
+        cols_string = ", ".join(target_column_names)
+        vals_string = ", ".join(["%s"] * len(target_column_names))
+        insert_query = f"INSERT INTO {table_name} ({cols_string}) VALUES ({vals_string})"
+        
+        postgres_cursor.executemany(insert_query, processed_rows)
+        postgres_conn.commit()
+        
+        print("\nMigration successful!")
+        print(f"{postgres_cursor.rowcount} rows were inserted into PostgreSQL.")
+
+    except (Exception, psycopg2.Error, sqlite3.Error) as error:
+        print(f"\nError during migration: {error}", file=sys.stderr)
+        if postgres_conn:
+            postgres_conn.rollback()
+            print("PostgreSQL transaction has been rolled back.", file=sys.stderr)
+
+    finally:
+        if sqlite_conn:
+            sqlite_conn.close()
+        if postgres_conn:
+            postgres_conn.close()
+        print("Database connections closed.")
+
+if __name__ == '__main__':
+    migrate_data()

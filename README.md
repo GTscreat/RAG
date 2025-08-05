@@ -21,9 +21,7 @@ git status
 git pull
 
 
-DELETE FROM content;
 DELETE FROM embeddings;
-DELETE FROM ner_results;
 DELETE FROM parameters;
 DELETE FROM ranks;
 DELETE FROM top;

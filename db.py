@@ -1,17 +1,20 @@
 # db.py
 import os
+from dotenv import load_dotenv
 from sqlalchemy import (
-    create_engine, Column, Integer, String, Text, Float, LargeBinary, ForeignKey
+    create_engine, Column, Integer, String, Text, Float, LargeBinary, ForeignKey, DateTime, JSON
 )
 from sqlalchemy.dialects.postgresql import JSONB  # Ներմուծում ենք JSONB-ն PostgreSQL-ի համար
-from sqlalchemy.orm import sessionmaker, declarative_base
+from sqlalchemy.orm import sessionmaker, declarative_base, relationship
 
 # --- 1. Միացման կարգավորումները փոխում ենք PostgreSQL-ի ---
-DB_USER = os.getenv("DB_USER", "postgres")
-DB_PASSWORD = os.getenv("DB_PASSWORD", "Aylabanutyun1991") # <-- Փոխարինեք ձեր գաղտնաբառով
-DB_HOST = os.getenv("DB_HOST", "localhost")
-DB_PORT = os.getenv("DB_PORT", "5432")
-DB_NAME = os.getenv("DB_NAME", "Dpir_database")
+load_dotenv()
+
+DB_USER = os.getenv("DB_USER")
+DB_PASSWORD = os.getenv("DB_PASSWORD") # <-- Փոխարինեք ձեր գաղտնաբառով
+DB_HOST = os.getenv("DB_HOST")
+DB_PORT = os.getenv("DB_PORT")
+DB_NAME = os.getenv("DB_NAME")
 
 # SQLAlchemy-ի միացման հասցեն PostgreSQL-ի համար
 SQLALCHEMY_DATABASE_URL = f"postgresql+psycopg2://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
@@ -25,44 +28,31 @@ Base = declarative_base()
 
 class Content(Base):
     __tablename__ = "content"
-    id = Column(Integer, primary_key=True) # SERIAL-ը SQLAlchemy-ն ավտոմատ կհասկանա
-    website = Column(String)
+    id = Column(Integer, primary_key=True)
+    website_id = Column(Integer, ForeignKey('websites.id')) # Ավելացնում ենք ForeignKey
+    url = Column(String)
     title = Column(String)
     content = Column(Text)
-    url = Column(String)
-    meta = Column(JSONB, nullable=True) # JSON -> JSONB
-    published_at = Column(String)
-
+    published_at = Column(DateTime)
+    meta = Column(JSON, nullable=True)
+    #  website = relationship("Website")
 
 class Embedding(Base):
     __tablename__ = "embeddings"
     id = Column(Integer, primary_key=True)
-    article_id = Column(Integer, ForeignKey('content.id', ondelete='CASCADE')) # Ավելացվել է կապ
-    website = Column(String, nullable=True)
-    title = Column(String, nullable=True)
-    published_at = Column(String, nullable=True)
-    url = Column(String, nullable=True)
-    meta = Column(JSONB, nullable=True) # JSON -> JSONB
+    article_id = Column(Integer, ForeignKey('content.id', ondelete='CASCADE'), nullable=False) # nullable=False-ը ցանկալի է
     chunk_content = Column(Text, nullable=True)
     chunk_start = Column(Integer, nullable=True)
     chunk_end = Column(Integer, nullable=True)
-    embedding = Column(LargeBinary, nullable=True) # PickleType -> LargeBinary (BYTEA-ի համար)
-
-
-class NERResult(Base):
-    __tablename__ = "ner_results"
-    # One-to-One կապ, id-ն և՛ առաջնային, և՛ արտաքին բանալի է
-    id = Column(Integer, ForeignKey('content.id', ondelete='CASCADE'), primary_key=True)
-    entities = Column(JSONB, nullable=True) # JSON -> JSONB
-
+    embedding = Column(LargeBinary, nullable=True)
 
 class Parameter(Base):
     __tablename__ = "parameters"
-    # One-to-One կապ
     id = Column(Integer, ForeignKey('content.id', ondelete='CASCADE'), primary_key=True)
     category = Column(String, nullable=True)
-    aver_embedding = Column(LargeBinary, nullable=True) # PickleType -> LargeBinary
-    similarity = Column(JSONB, nullable=True) # JSON -> JSONB
+    aver_embedding = Column(LargeBinary, nullable=True)
+    similarity = Column(JSONB, nullable=True)
+    entities = Column(JSONB, nullable=True) # <<< ԱՎԵԼԱՑՎԱԾ ՆՈՐ ՍՅՈՒՆԱԿ
 
 class Rank(Base):
     __tablename__ = "ranks"
@@ -115,3 +105,9 @@ class Entity(Base):
     word = Column(String)
     ner_score = Column(Float)
     category_id = Column(Integer, ForeignKey('entity_categories.id', ondelete='SET NULL'), nullable=True)
+
+# class Website(Base):
+#     __tablename__ = 'websites'
+#     id = Column(Integer, primary_key=True)
+#     url = Column(String, unique=True) 
+

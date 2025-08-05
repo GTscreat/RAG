@@ -2,11 +2,12 @@ import time
 import threading
 
 # --- Collector Imports ---
-from collector.get_api import fetch_articles, insert_articles_to_db
+# ՓՈՓՈԽՎԱԾ Է. Հեռացնում ենք հին ֆունկցիաները, ներմուծում ենք նորը
+from collector.article_selector import select_new_articles
 from collector.chunker import chunk_articles_and_store
 from collector.embedding import embed_chunks
-from collector.utils import filter_new_articles
 from collector.ner import load_ner_pipeline, run_ner_on_articles, save_ner_results_to_db
+# --- Ranker Imports ---
 from ranker.frequency_classifier import update_aver_embeddings, run_frequency_classifier
 from ranker.thematic_classifier import run_thematic_classifier
 from ranker.ranking import rank_news
@@ -21,7 +22,6 @@ from composer.selector import get_next_unprocessed_top_id
 from composer.composing import prompt_gen_request, generate_content_with_openai, save_processed
 from composer.composing_ru import prompt_gen_request_ru, generate_content_with_openai_ru, save_processed_ru
 
-
 # --- Spreader Imports ---
 from spreader.selector import select_to_publish
 from spreader.publishing import publishing_cycle, get_urgent_value, publishing_cycle_ru
@@ -29,68 +29,47 @@ from spreader.publishing import publishing_cycle, get_urgent_value, publishing_c
 def main_blocks():
     ner_pipeline = load_ner_pipeline()
     while True:
-        print("----- Կատարվում է API հարցում -----")
-        data = fetch_articles()
-        if data is None:
-            print("Հոդվածներ ստանալը ձախողվեց։ Սպասում ենք հաջորդ ցիկլին...")
-            time.sleep(90)
-            continue
-
-        articles = data.get('data', [])
-        if not articles:
-            print("Հոդվածների ցանկը դատարկ է։ Սպասում ենք հաջորդ ցիկլին...")
-            time.sleep(90)
-            continue
-
-        new_articles = filter_new_articles(articles)
-        if not new_articles:
-            print("Նոր հոդվածներ չկան։ Սպասում ենք հաջորդ ցիկլին...")
-            time.sleep(90)
-            continue
-
-        print(f"{len(new_articles)} նոր հոդված հայտնաբերվեց։")
-        print("----- Ավելացնում ենք նոր հոդվածները բազայում -----")
+        # =================================================================
+        # === ՀԻՄՆԱԿԱՆ ՌԵՖԱԿՏՈՐԻՆԳ ===
+        # Հին API-ի հետ կապված տրամաբանությունը փոխարինվում է մեկ ֆունկցիայի կանչով
+        # =================================================================
         
-        # ՀԻՄՆԱԿԱՆ ՓՈՓՈԽՈՒԹՅՈՒՆԸ. Պահպանում ենք ֆունկցիայի վերադարձրած արժեքը
-        inserted_articles = insert_articles_to_db(new_articles)
-        
-        # Ստուգում ենք, արդյոք զտումից հետո հոդվածներ մնացել են
-        if not inserted_articles:
-            print("Բոլոր նոր հոդվածները բաց թողնվեցին (օր.՝ դատարկ բովանդակություն)։ Սպասում ենք հաջորդ ցիկլին...")
+        new_articles_to_process = select_new_articles()
+
+        if not new_articles_to_process:
+            print("Նոր հոդվածներ չկան մշակման համար։ Սպասում ենք հաջորդ ցիկլին...")
             time.sleep(90)
             continue
-
+        
+        # Հաջորդ քայլերը սկսվում են անմիջապես, քանի որ հոդվածներն արդեն բազայում են
+        # և ընտրված են մշակման համար։
         print("----- Կատարվում է չանկավորում և պահում -----")
-        # Հետագա բոլոր գործողությունների համար օգտագործում ենք զտված ցուցակը
-        chunk_articles_and_store(inserted_articles)
+        chunk_articles_and_store(new_articles_to_process)
 
         print("----- Կատարվում է embedding-ի հաշվարկ և պահում -----")
-        session = SessionLocal()
-        chunks_to_embed = session.query(Embedding).filter(Embedding.embedding == None).all()
-        chunk_dicts = [{
-            "id": ch.id,
-            "website": ch.website,
-            "title": ch.title,
-            "published_at": ch.published_at,
-            "url": ch.url,
-            "meta": ch.meta,
-            "chunk_content": ch.chunk_content,
-            "chunk_start": ch.chunk_start,
-            "chunk_end": ch.chunk_end,
-        } for ch in chunks_to_embed]
-        session.close()
+        # ԲԱՐԵԼԱՎՈՒՄ. Սեսիայի կառավարում 'with' բլոկով
+        with SessionLocal() as session:
+            chunks_to_embed = session.query(Embedding).filter(Embedding.embedding.is_(None)).all()
+            # ՈՒՂՂՈՒՄ. 'website' -> 'website_id' մեր նոր մոդելին համապատասխան
+            # ԹԱՐՄԱՑՎԱԾ ԲԱՌԱՐԱՆԻ ՍՏԵՂԾՈՒՄ
+            chunk_dicts = [{
+                "id": ch.id,
+                "chunk_content": ch.chunk_content,
+            } for ch in chunks_to_embed]
 
         if chunk_dicts:
             embed_chunks(chunk_dicts, save_mode="update")
-            print(f"{len(chunk_dicts)} embedding computed and saved.")
+            print(f"{len(chunk_dicts)} embedding հաշվարկվեց և պահպանվեց։")
         else:
-            print("Embedding-ը արդեն հաշվարկված է բոլոր չանկերի համար։")
+            print("Embedding-ն արդեն հաշվարկված է բոլոր չանկերի համար։")
+  
 
         print("----- Կատարվում է Named Entity Recognition (NER) և պահում -----")
-        # Այստեղ նույնպես օգտագործում ենք զտված ցուցակը
-        ner_results = run_ner_on_articles(inserted_articles, ner_pipeline)
+        ner_results = run_ner_on_articles(new_articles_to_process, ner_pipeline)
         save_ner_results_to_db(ner_results)
-        print(f"NER արդյունքները պահված են բազայում։")
+        
+        # NER-ի արդյունքների պահպանման տպելու հրամանը տեղափոխված է save_ner_results_to_db ֆունկցիայի մեջ,
+        # ուստի այստեղ այն այլևս պետք չէ կրկնել։
 
         print("----- Կատարվում է aver_embedding-ի թարմացում -----")
         update_aver_embeddings()
@@ -108,39 +87,39 @@ def main_blocks():
         scores = refresh_top_and_score()
         if scores:
             print("OpenAI Scoring Results:\n", scores)
-            update_top_with_ai_score(scores)
+            # update_top_with_ai_score-ը արդեն կանչվում է refresh_top_and_score-ի ներսում,
+            # ուստի այստեղ այն կրկնելու կարիք չկա։
             print("Top table updated with ai_score and final_score.")
         else:
             print("No top content available.")
 
         print("----- Կատարվում է նոր գեներացված կոնտենտի ստեղծում TOP-ի համար -----")
-        processed_count = 0
-
-        
-        for _ in range(10):
+        for _ in range(10): # Փորձում ենք մշակել մինչև 10 նյութ
             next_id = get_next_unprocessed_top_id()
             if not next_id:
                 print("No new top content to process.")
                 break
         
             # Armenian content
-            prompt, content = prompt_gen_request(next_id)
-            generated = generate_content_with_openai(prompt, content)
-            save_processed(next_id, generated)
-            print(f"Generated and saved Armenian content for base_id={next_id}")
+            prompt, content_data = prompt_gen_request(next_id)
+            if prompt and content_data:
+                generated = generate_content_with_openai(prompt, content_data)
+                save_processed(next_id, generated)
+                print(f"Generated and saved Armenian content for base_id={next_id}")
         
             # Russian content
-            prompt_ru, content_ru = prompt_gen_request_ru(next_id)
-            generated_ru = generate_content_with_openai_ru(prompt_ru, content_ru)
-            save_processed_ru(next_id, generated_ru)
-            print(f"Generated and saved Russian content for base_id={next_id}")
-        
-            processed_count += 1
+            prompt_ru, content_data_ru = prompt_gen_request_ru(next_id)
+            if prompt_ru and content_data_ru:
+                generated_ru = generate_content_with_openai_ru(prompt_ru, content_data_ru)
+                save_processed_ru(next_id, generated_ru)
+                print(f"Generated and saved Russian content for base_id={next_id}")
 
         print("----- Շրջանն ավարտվեց, սպասում ենք 1.5 րոպե -----")
-        time.sleep(90)  # 3 րոպե
+        time.sleep(90)
 
+# spreader_block, spreader_monitor և if __name__ == "__main__" բլոկերը մնում են անփոփոխ
 def spreader_block(wakeup_event):
+    # ... (անփոփոխ)
     while True:
         print("----- Սկսվում է հրապարակման ցիկլ (SPREADER) -----")
         select_to_publish()
@@ -148,16 +127,15 @@ def spreader_block(wakeup_event):
         sleep_time = publishing_cycle()
         if sleep_time is None:
             sleep_time = 90  # default value
-        sleep_time_ru = publishing_cycle_ru()
-        if sleep_time_ru is None:
-            sleep_time_ru = 90  # default value
-        print(f"Հրապարակման ցիկլից հետո սպասում ենք {max(sleep_time, sleep_time_ru)} վայրկյան...")
-        woke_up = wakeup_event.wait(timeout=max(sleep_time, sleep_time_ru))
+        publishing_cycle_ru() # Ru cycle doesn't need to return sleep time
+        print(f"Հրապարակման ցիկլից հետո սպասում ենք {sleep_time} վայրկյան...")
+        woke_up = wakeup_event.wait(timeout=sleep_time)
         if woke_up:
             print("[SPREADER] Urgent detected, waking up for immediate publishing.")
             wakeup_event.clear()
 
 def spreader_monitor(wakeup_event, check_interval=30):
+    # ... (անփոփոխ)
     last_urgent = None
     while True:
         urgent = get_urgent_value()
@@ -169,18 +147,14 @@ def spreader_monitor(wakeup_event, check_interval=30):
         time.sleep(check_interval)
 
 if __name__ == "__main__":
+    # ... (անփոփոխ)
     main_thread = threading.Thread(target=main_blocks, daemon=True)
     main_thread.start()
-
-    # Event to wake up spreader if urgent content appears
     wakeup_event = threading.Event()
-
     spreader_thread = threading.Thread(target=spreader_block, args=(wakeup_event,), daemon=True)
     spreader_thread.start()
-
     monitor_thread = threading.Thread(target=spreader_monitor, args=(wakeup_event,), daemon=True)
     monitor_thread.start()
-
     try:
         while True:
             time.sleep(1)
