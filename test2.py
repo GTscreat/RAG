@@ -20,6 +20,7 @@ pg_config = {
 
 # 3. Աղյուսակի և սյունակի անունները
 table_name = 'content'
+table_name_postgres = 'news'
 datetime_column_name = 'published_at'
 
 # 4. SQLite-ի ամսաթվի ֆորմատը
@@ -104,11 +105,11 @@ def migrate_data():
             processed_rows.append(tuple(filtered_row_list))
 
         # 4. Ներմուծել տվյալները PostgreSQL
-        print(f"Inserting data into PostgreSQL table '{table_name}'...")
+        print(f"Inserting data into PostgreSQL table '{table_name_postgres}'...")
         
         cols_string = ", ".join(target_column_names)
         vals_string = ", ".join(["%s"] * len(target_column_names))
-        insert_query = f"INSERT INTO {table_name} ({cols_string}) VALUES ({vals_string})"
+        insert_query = f"INSERT INTO {table_name_postgres} ({cols_string}) VALUES ({vals_string})"
         
         postgres_cursor.executemany(insert_query, processed_rows)
         postgres_conn.commit()

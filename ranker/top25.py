@@ -1,11 +1,10 @@
 import os
 import numpy as np
 from sqlalchemy.orm import Session
-from db import SessionLocal, Rank, Parameter, Content, Top, Processed
+from db import SessionLocal, Rank, Parameter, News, Top, Processed
 from retriever.prompt_templates import TOP_REQUEST_ROLE, TOP_REQUEST
 from openai import OpenAI
 import re
-import json
 
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 client = OpenAI(api_key=OPENAI_API_KEY)
@@ -109,10 +108,17 @@ def update_top_table(db: Session, top_n=25):
 
 def get_top_contents(db: Session):
     top_rows = db.query(Top).all()
+    if not top_rows:
+        return []
+        
     ids = [row.id for row in top_rows]
-    contents = db.query(Content).filter(Content.id.in_(ids)).all()
+    # ՈՒՂՂՈՒՄ. Օգտագործում ենք ճիշտ՝ News մոդելը
+    contents = db.query(News).filter(News.id.in_(ids)).all()
     id_to_content = {c.id: c.content for c in contents}
-    return [(id_, id_to_content.get(id_, "")) for id_ in ids]
+    
+    # Համոզվում ենք, որ բոլոր id-ների համար կոնտենտ կա
+    return [(id_, id_to_content.get(id_, "")) for id_ in ids if id_ in id_to_content]
+
 
 def openai_score_stories(top_contents):
     previous_messages = [{"role": "system", "content": TOP_REQUEST_ROLE}] + context_memory.get()
@@ -145,29 +151,22 @@ def parse_openai_response(response_text):
         }
     return results
 
-def update_top_with_ai_score(scores_dict):
+def update_top_with_ai_score_in_session(db: Session, scores_dict):
     """
-    Թարմացնում է Top աղյուսակը AI-ի կողմից տրված գնահատականներով։
-    Օգտագործում է 'with' բլոկ՝ սեսիայի ավտոմատ կառավարման համար։
+    Թարմացնում է Top աղյուսակը՝ օգտագործելով փոխանցված սեսիան։
     """
     if not scores_dict:
         return
         
-    with SessionLocal() as db:
-        try:
-            for id_, vals in scores_dict.items():
-                top_row = db.query(Top).filter(Top.id == id_).first()
-                if top_row:
-                    top_row.ai_score = vals.get("ai_score")
-                    top_row.urgency = vals.get("urgency")
-                    top_row.sentiment = vals.get("sentiment")
-                    top_row.geopolitical = vals.get("geopolitical")
-                    if top_row.total_score is not None and top_row.ai_score is not None:
-                        top_row.final_score = 0.5 * top_row.total_score + 0.5 * top_row.ai_score
-            db.commit()
-        except Exception as e:
-            print(f"❌ Սխալ՝ Top աղյուսակը AI գնահատականներով թարմացնելիս: {e}")
-            db.rollback()
+    for id_, vals in scores_dict.items():
+        top_row = db.query(Top).filter(Top.id == id_).first()
+        if top_row:
+            top_row.ai_score = vals.get("ai_score")
+            top_row.urgency = vals.get("urgency")
+            top_row.sentiment = vals.get("sentiment")
+            top_row.geopolitical = vals.get("geopolitical")
+            if top_row.total_score is not None and top_row.ai_score is not None:
+                top_row.final_score = 0.55 * top_row.total_score + 0.45 * top_row.ai_score
 
 
 def refresh_top_and_score():
@@ -177,30 +176,31 @@ def refresh_top_and_score():
     """
     with SessionLocal() as db:
         try:
-            # Թարմացնում ենք Top աղյուսակը top թեկնածուներով
+            # 1. Ընտրում ենք թեկնածուներին
             top_candidates = get_top_ids_with_scores(db)
+            
+            # 2. Ջնջում ենք հին տվյալները Top աղյուսակից
             db.query(Top).delete()
-            db.flush() # Համոզվում ենք, որ delete-ը կատարվել է commit-ից առաջ
+            
+            # 3. Ավելացնում ենք նոր թեկնածուներին
             for id_, score in top_candidates:
                 db.add(Top(id=id_, total_score=score))
             
-            # Ստանում ենք նոր top-ի կոնտենտը OpenAI-ին ուղարկելու համար
+            # 4. ՀԻՄՆԱԿԱՆ ՈՒՂՂՈՒՄԸ. flush()
+            # db.flush()-ը ուղարկում է INSERT/DELETE հրամանները բազա՝ առանց տրանզակցիան փակելու։
+            # Սա թույլ է տալիս, որ հաջորդ հարցումը տեսնի նոր ավելացված տվյալները։
+            db.flush()
+
+            # 5. Այժմ ստանում ենք նոր top-ի կոնտենտը OpenAI-ին ուղարկելու համար
             top_contents = get_top_contents(db)
             
             if top_contents:
                 response_text = openai_score_stories(top_contents)
                 scores_dict = parse_openai_response(response_text)
                 
-                # Թարմացնում ենք նույն սեսիայի մեջ AI գնահատականները
-                for id_, vals in scores_dict.items():
-                    top_row = db.query(Top).filter(Top.id == id_).first()
-                    if top_row:
-                        top_row.ai_score = vals.get("ai_score")
-                        top_row.urgency = vals.get("urgency")
-                        top_row.sentiment = vals.get("sentiment")
-                        top_row.geopolitical = vals.get("geopolitical")
-                        if top_row.total_score is not None and top_row.ai_score is not None:
-                            top_row.final_score = 0.5 * top_row.total_score + 0.5 * top_row.ai_score
+                # 6. Թարմացնում ենք նույն սեսիայի մեջ AI գնահատականները
+                # Այս ֆունկցիան պետք է նույնպես ստանա db սեսիան
+                update_top_with_ai_score_in_session(db, scores_dict)
                 
                 db.commit() # Ամբողջ գործարքը հաստատում ենք մեկ անգամ
                 return scores_dict

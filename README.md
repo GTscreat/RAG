@@ -20,6 +20,9 @@ git status
 
 git pull
 
+git reset --mixed HEAD~1 #չեղարկում է commit-ները
+git rm --cached <ֆայլի_անունը> #Հեռացնել ֆայլը commit արված ցանկից (staging area-ից)
+
 
 DELETE FROM embeddings;
 DELETE FROM parameters;
@@ -27,6 +30,7 @@ DELETE FROM ranks;
 DELETE FROM top;
 DELETE FROM processed;
 
+DROP TABLE ...;
 
 GRANT SELECT ON entities TO public;
 GRANT SELECT ON entity_categories TO public;

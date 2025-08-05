@@ -5,10 +5,7 @@ import os
 
 from db import SessionLocal, Embedding
 
-MODEL_PATH = os.getenv(
-    "ARMENIAN_EMBEDDING_MODEL_PATH",
-    "Metric-AI/armenian-text-embeddings-1"
-)
+MODEL_PATH = "Metric-AI/armenian-text-embeddings-1"
 
 model = SentenceTransformer(MODEL_PATH)
 

@@ -1,7 +1,7 @@
 # selector.py
 import os
 import pickle
-from db import SessionLocal, Processed, Top, Content
+from db import SessionLocal, Processed, Top, News
 from sqlalchemy import and_, or_, func
 
 def save_urgent_value(value, path='spreader/selector_urgent_value.txt'):
@@ -56,7 +56,7 @@ def select_to_publish():
                         chosen_id = high_score_candidates[0]
                     else:
                         # Ընտրում ենք ամենահին հոդվածը
-                        content_times_query = db.query(Content.id, Content.published_at).filter(Content.id.in_(candidate_pool))
+                        content_times_query = db.query(News.id, News.published_at).filter(News.id.in_(candidate_pool))
                         content_times = [c for c in content_times_query.all() if c.published_at is not None]
                         
                         if content_times:

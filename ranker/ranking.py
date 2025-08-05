@@ -1,7 +1,7 @@
 # ranking.py
 import json
 import math
-from db import SessionLocal, Content, Parameter, Rank
+from db import SessionLocal, News, Parameter, Rank
 from ranker.ner_importance import calculate_ner_importance
 
 # --- Կոնֆիգուրացիոն ֆայլերի ճանապարհները ---
@@ -61,8 +61,7 @@ def calc_total_score(thematic, ner, freq, source):
 
 def rank_news():
     """
-    Կատարում է բոլոր նորությունների ռանժավորում՝ արդյունավետ կերպով, 
-    մշակելով տվյալները մաս-մաս (batches)՝ հիշողությունը չծանրաբեռնելու համար։
+    Վերլուծում է միայն վերջին 100 ամենաթարմ հոդվածները ըստ published_at։
     """
     with SessionLocal() as session:
         try:
@@ -71,11 +70,13 @@ def rank_news():
             
             count_processed = 0
             
-            query = session.query(Content, Parameter).outerjoin(Parameter, Content.id == Parameter.id).yield_per(100)
+            # Վերցնում ենք վերջին 100 հոդվածները ըստ published_at-ի
+            recent_news = session.query(News).order_by(News.published_at.desc()).limit(100).all()
+            news_ids = [n.id for n in recent_news]
             
-            # query.count()-ը կարող է դանդաղ լինել մեծ աղյուսակների դեպքում, սակայն այս պահին ընդունելի է
-            total_articles = session.query(Content).count() 
-            print(f"Սկսում ենք սանդղակավորումը {total_articles} նյութի համար...")
+            query = session.query(News, Parameter).outerjoin(Parameter, News.id == Parameter.id).filter(News.id.in_(news_ids))
+            
+            print(f"Սկսում ենք սանդղակավորումը {len(news_ids)} վերջին հոդվածների համար...")
 
             for article, param in query:
                 id_ = article.id
@@ -98,11 +99,11 @@ def rank_news():
                     sim_sum = sum(float(s.get("similarity_index", 0)) for s in param.similarity)
                     freq_score = normalize(sim_sum, MIN_FREQ, MAX_FREQ)
 
-                # 4. Աղբյուր (Օգտագործում ենք մեր ստեղծած բառարանը)
+                # 4. Աղբյուր
                 source_score = 1.0
                 website_url = WEBSITE_ID_MAP.get(article.website_id)
                 if website_url and website_url in media_rating:
-                     source_score = media_rating[website_url]
+                    source_score = media_rating[website_url]
 
                 # 5. Ընդհանուր միավոր
                 total_score = calc_total_score(thematic_score, ner_score, freq_score, source_score)
@@ -119,7 +120,7 @@ def rank_news():
                 count_processed += 1
             
             session.commit()
-            print(f"Ռանժավորումն ավարտված է։ Մշակվեց {count_processed} նյութ։")
+            print(f"Ռանժավորումն ավարտված է։ Մշակվեց {count_processed} հոդված։")
         
         except Exception as e:
             print(f"❌ Սխալ՝ ռանժավորման ընթացքում: {e}")

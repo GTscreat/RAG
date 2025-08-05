@@ -1,9 +1,9 @@
 # collector/article_selector.py
 
 from datetime import datetime, timedelta, timezone
-from db import SessionLocal, Content, Embedding
+from db import SessionLocal, News, Embedding
 
-def select_new_articles(time_window_hours: int = 24):
+def select_new_articles(time_window_hours: int = 1):
     """
     Ընտրում է այն բոլոր հոդվածները, որոնք հրապարակվել են նշված ժամանակային
     միջակայքում ԵՎ դեռևս չունեն գրառում `embeddings` աղյուսակում։
@@ -20,18 +20,18 @@ def select_new_articles(time_window_hours: int = 24):
             from_time = datetime.now(timezone.utc) - timedelta(hours=time_window_hours)
             
             # 2. Կատարում ենք համակցված հարցում
-            new_articles = session.query(Content).outerjoin(
-                Embedding, Content.id == Embedding.article_id
+            new_articles = session.query(News).outerjoin(
+                Embedding, News.id == Embedding.article_id
             ).filter(
                 # Պայման 1. Հոդվածը դեռ չպետք է ունենա embedding
                 Embedding.id.is_(None),
                 
                 # Պայման 2. Հոդվածը պետք է հրապարակված լինի նշված ժամանակահատվածում
-                Content.published_at >= from_time
+                News.published_at >= from_time
             ).all()
 
             if new_articles:
-                print(f"{len(new_articles)} նոր (չմբեդավորված) հոդված հայտնաբերվեց նշված ժամանակահատվածում։")
+                print(f"{len(new_articles)} նոր (չէմբեդավորված) հոդված հայտնաբերվեց նշված ժամանակահատվածում։")
             else:
                 print("Նշված ժամանակահատվածում չմշակված նոր հոդվածներ չկան։")
 

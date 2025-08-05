@@ -1,5 +1,5 @@
 import os
-from db import SessionLocal, Processed, Content
+from db import SessionLocal, Processed, News
 from dotenv import load_dotenv
 from telegram import Bot
 import asyncio
@@ -85,7 +85,7 @@ async def publish_to_telegram_ru(text, image_url=None):
             return False
 
 def get_image_url(db, base_id):
-    content_row = db.query(Content).filter(Content.id == base_id).first()
+    content_row = db.query(News).filter(News.id == base_id).first()
 
     if not content_row:
         print(f"[DEBUG] get_image_url: Content տողը base_id={base_id}-ի համար չի գտնվել։")
@@ -153,7 +153,7 @@ def publishing_cycle():
             row = db.query(Processed).filter(Processed.published == "publish").first()
             if row:
                 print(f"[INFO] Found content to publish. base_id={row.base_id}")
-                content_row = db.query(Content).filter(Content.id == row.base_id).first()
+                content_row = db.query(News).filter(News.id == row.base_id).first()
                 url = content_row.url if content_row and content_row.url else "https://t.me/newsarmaipowerd"
                 image_url = get_image_url(db, row.base_id)
                 message = format_telegram_message(row.title or "", row.generated_content or "", url)
@@ -202,7 +202,7 @@ def publishing_cycle_ru():
             row = db.query(Processed).filter(Processed.published_r == "publish").first()
             if row:
                 print(f"[INFO] Found RU content to publish. base_id={row.base_id}")
-                content_row = db.query(Content).filter(Content.id == row.base_id).first()
+                content_row = db.query(News).filter(News.id == row.base_id).first()
                 url = content_row.url if content_row and content_row.url else "https://t.me/newsrusaipowerd"
                 image_url = get_image_url(db, row.base_id)
                 

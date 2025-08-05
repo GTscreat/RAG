@@ -1,5 +1,5 @@
 # composing.py
-from db import SessionLocal, Content, Parameter, Top, Processed
+from db import SessionLocal, News, Parameter, Top, Processed
 import json
 import re
 from composer.llm_prompts import (
@@ -31,13 +31,13 @@ def prompt_gen_request_ru(base_id):
         try:
             # 1. ԱՌԱՋԻՆ ՀԱՐՑՈՒՄ. JOIN-ի միջոցով ստանում ենք հիմնական տվյալները
             main_data = session.query(
-                Content.content,
+                News.content,
                 Parameter.similarity,
                 Top.geopolitical
-            ).select_from(Content) \
-             .outerjoin(Parameter, Content.id == Parameter.id) \
-             .outerjoin(Top, Content.id == Top.id) \
-             .filter(Content.id == base_id).first()
+            ).select_from(News) \
+             .outerjoin(Parameter, News.id == Parameter.id) \
+             .outerjoin(Top, News.id == Top.id) \
+             .filter(News.id == base_id).first()
 
             if not main_data:
                 print(f"[ERROR] Δεν βρέθηκαν δεδομένα για το base_id: {base_id}")
@@ -50,7 +50,7 @@ def prompt_gen_request_ru(base_id):
                 sim_ids = [sim.get("id") for sim in similarity_data if sim.get("id")]
                 if sim_ids:
                     # 2. ԵՐԿՐՈՐԴ ՀԱՐՑՈՒՄ. Ստանում ենք բոլոր նմանատիպ հոդվածների կոնտենտը մեկ հարցումով
-                    back_context_results = session.query(Content.content).filter(Content.id.in_(sim_ids)).all()
+                    back_context_results = session.query(News.content).filter(News.id.in_(sim_ids)).all()
                     for row in back_context_results:
                         formatted_ctx = format_back_context_ru(row[0])
                         if formatted_ctx:

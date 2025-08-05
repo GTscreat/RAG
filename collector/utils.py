@@ -1,4 +1,4 @@
-from db import SessionLocal, Content
+from db import SessionLocal, News
 
 def filter_new_articles(articles):
     """
@@ -20,7 +20,7 @@ def filter_new_articles(articles):
         # Հարցում ենք կատարում բազային՝ ստուգելու համար, թե մեր ստացած ID-ներից
         # որոնք արդեն գոյություն ունեն։ Սա շատ ավելի արդյունավետ է։
         existing_ids = {
-            result[0] for result in session.query(Content.id).filter(Content.id.in_(incoming_ids))
+            result[0] for result in session.query(News.id).filter(News.id.in_(incoming_ids))
         }
 
     # Գտնում ենք նոր ID-ները՝ հանելով գոյություն ունեցողները եկածներից
