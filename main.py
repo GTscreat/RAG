@@ -15,7 +15,6 @@ from db import SessionLocal, Embedding
 
 # --- Top Scoring Imports ---
 from ranker.top25 import refresh_top_and_score
-from ranker.top_over import update_top_with_ai_score
 
 # --- Content Generation Imports ---
 from composer.selector import get_next_unprocessed_top_id
