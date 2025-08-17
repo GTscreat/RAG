@@ -21,3 +21,4 @@ data/scrappe_dump.sql
 RAG_old_version/
 /RAG_old_version
 /RAG_old_versiondata/scrappe_dump.sql
+*.sql

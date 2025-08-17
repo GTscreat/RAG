@@ -111,3 +111,4 @@ class Entity(Base):
 #     id = Column(Integer, primary_key=True)
 #     url = Column(String, unique=True) 
 
+Base.metadata.create_all(engine)
