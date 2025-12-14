@@ -1,399 +1,658 @@
-python -m venv venv
-.\venv\Scripts\Activate.ps1
-Եթե չի ստացվում - Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
-pip install -r requirements.txt
+# 📰 Armenian News Intelligence & Publishing System (RAG Pipeline)
 
-.\venv\Scripts\python.exe -m pip install ......
+> An end-to-end automated news processing, ranking, content generation, and multi-channel publishing system for Armenian news media.
 
-2. 
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-.\.venv\Scripts\python.exe -m pip install ......
-pip install -r requirements.txt
+## 🎯 System Overview
 
+This project implements a sophisticated **Retrieval-Augmented Generation (RAG)** pipeline specifically designed for Armenian news content. The system continuously:
 
-git status
-git add .
-git commit -m "update 1"
-git push origin master
-git status
+1. **Collects** news articles from multiple Armenian media sources
+2. **Processes** them with embeddings and Named Entity Recognition (NER)
+3. **Ranks** articles based on topic importance, entity significance, frequency, and source credibility
+4. **Generates** AI-enhanced content in Armenian and Russian languages
+5. **Publishes** to Telegram channels with intelligent scheduling
 
-git pull
-
-git reset --mixed HEAD~1 #չեղարկում է commit-ները
-git rm --cached <ֆայլի_անունը> #Հեռացնել ֆայլը commit արված ցանկից (staging area-ից)
-
-
-DELETE FROM embeddings;
-DELETE FROM parameters;
-DELETE FROM ranks;
-DELETE FROM top;
-DELETE FROM processed;
-
-DROP TABLE ...;
-
-GRANT SELECT ON entities TO public;
-GRANT SELECT ON entity_categories TO public;
-
--- 2. Վերցնել INSERT, UPDATE, DELETE իրավունքները
-REVOKE INSERT, UPDATE, DELETE ON entities FROM public;
-REVOKE INSERT, UPDATE, DELETE ON entity_categories FROM public;
-
-
-# AI-Powered News Pipeline - A System for News Aggregation and Content Generation
-
-This is a multi-threaded Python application designed for the automated aggregation, processing, analysis, and ranking of news from Armenian sources. Based on this analysis, it generates unique content in both Armenian and Russian for subsequent publication on Telegram channels.
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         SYSTEM ARCHITECTURE                                  │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐    ┌────────────┐ │
+│  │  COLLECTOR   │───▶│    RANKER    │───▶│   COMPOSER   │───▶│  SPREADER  │ │
+│  │              │    │              │    │              │    │            │ │
+│  │ • Selector   │    │ • Thematic   │    │ • Selector   │    │ • Selector │ │
+│  │ • Chunker    │    │ • Frequency  │    │ • Composing  │    │ • Publish  │ │
+│  │ • Embedding  │    │ • NER Score  │    │ • LLM Prompts│    │ • Telegram │ │
+│  │ • NER        │    │ • Ranking    │    │              │    │            │ │
+│  └──────────────┘    │ • Top25      │    └──────────────┘    └────────────┘ │
+│                      └──────────────┘                                        │
+│                                                                              │
+│  ┌──────────────────────────────────────────────────────────────────────┐   │
+│  │                        RETRIEVER (RAG Q&A)                            │   │
+│  │  Query Embedding → Semantic Search → LLM Answer Generation            │   │
+│  └──────────────────────────────────────────────────────────────────────┘   │
+│                                                                              │
+│                           ┌─────────────────┐                                │
+│                           │   PostgreSQL    │                                │
+│                           │    Database     │                                │
+│                           └─────────────────┘                                │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
 
 ---
 
-## **Core Features**
+## 📁 Project Structure
 
-* **Automatic Aggregation:** Periodically fetches new articles from various news websites via an external API.
-* **Intelligent Processing:**
-    * Segments article text into logical parts (chunks).
-    * Creates a vector representation (embedding) for each chunk using `sentence-transformers`.
-    * Performs Named Entity Recognition (NER) to extract key persons, locations, and organizations from the text.
-* **Multi-layered Ranking:** Articles are scored based on multiple factors, including thematic relevance, frequency, NER entity importance, and source reputation.
-* **AI-Powered Scoring and Content Generation:**
-    * The top-ranked articles are sent to OpenAI (GPT-4o/4.1) for additional scoring (importance, urgency, sentiment).
-    * Based on the highest-ranking articles, new, summarized analytical texts are generated in both Armenian and Russian.
-* **Automated Publishing:** The generated content is published to two separate Telegram channels according to urgency and other predefined rules.
-* **Robust Database:** The system uses a PostgreSQL database via the SQLAlchemy ORM, which ensures high performance, scalability, and data integrity through well-defined relationships (Foreign Keys).
+```
+RAG/
+├── main.py                    # Main orchestrator (multi-threaded execution)
+├── main_out.py                # RAG Query Interface (Q&A mode)
+├── db.py                      # SQLAlchemy ORM models & database connection
+├── db_connector.py            # Raw psycopg2 connector (utility)
+├── schema.sql                 # PostgreSQL schema definitions
+├── migrate_data.py            # SQLite → PostgreSQL migration tool
+├── requirements.txt           # Python dependencies
+│
+├── collector/                 # 📥 DATA COLLECTION MODULE
+│   ├── article_selector.py    # Select unprocessed articles from DB
+│   ├── chunker.py             # Text chunking with overlap
+│   ├── embedding.py           # Armenian text embeddings (Sentence Transformers)
+│   ├── local_embedding.py     # Standalone embedding utilities
+│   ├── ner.py                 # Named Entity Recognition pipeline
+│   └── utils.py               # Article filtering utilities
+│
+├── ranker/                    # 📊 RANKING & SCORING MODULE
+│   ├── thematic_classifier.py # Topic classification via embeddings
+│   ├── frequency_classifier.py# Duplicate/similarity detection
+│   ├── ner_importance.py      # NER-based content importance scoring
+│   ├── ranking.py             # Multi-factor ranking algorithm
+│   └── top25.py               # Top candidates selection + AI scoring
+│
+├── composer/                  # ✍️ CONTENT GENERATION MODULE
+│   ├── selector.py            # Select next unprocessed top article
+│   ├── composing.py           # Armenian content generation (GPT-4.1)
+│   ├── composing_ru.py        # Russian content generation (GPT-4.1)
+│   └── llm_prompts.py         # Prompt templates library
+│
+├── spreader/                  # 📤 PUBLISHING MODULE
+│   ├── selector.py            # Urgency-based publishing queue
+│   ├── publishing.py          # Telegram publishing logic
+│   ├── telegram_message.py    # Message formatting (MarkdownV2)
+│   └── selector_urgent_value.txt
+│
+├── retriever/                 # 🔍 RAG QUERY MODULE
+│   ├── retriever.py           # Semantic search & article retrieval
+│   ├── llm_client.py          # LLM API client (OpenAI/Anthropic)
+│   ├── prompt_templates.py    # RAG prompt configurations
+│   └── rag_query.py           # Interactive query interface
+│
+└── data/                      # 📂 DATA & TEMPLATES
+    ├── tamplates/
+    │   ├── thematic_corpus.json           # Topic classification corpus
+    │   ├── thematic_corpus_embeddings.json# Pre-computed topic embeddings
+    │   ├── media_rating.json              # Source credibility ratings
+    │   ├── ner.md                         # NER documentation
+    │   └── *.py                           # Embedding generation scripts
+    ├── ner_class.db                       # NER classification database
+    └── nerdatabase.db                     # Entity database
+```
 
-## **System Architecture and Workflow**
+---
 
-The system operates as a continuous cycle using several parallel threads.
+## 🔧 Core Modules
 
-1.  **Collection Stage (`Collector`):**
-    * The main loop in `main.py` calls `fetch_articles()` to get articles from the API.
-    * `filter_new_articles()` filters for new articles by comparing them against the `content` table.
-    * New articles are saved to the `content` table.
+### 1. 📥 Collector Module (`collector/`)
 
-2.  **Processing Stage (`Collector`):**
-    * `chunk_articles_and_store()` splits the article texts into chunks and saves them to the `embeddings` table.
-    * `embed_chunks()` calculates the vector embeddings and updates the `embeddings` table.
-    * `run_ner_on_articles()` performs NER analysis, saves the results to the `ner_results` table, and adds new entities to the `entities` table.
+Responsible for ingesting and preprocessing news articles.
 
-3.  **Analysis and Ranking Stage (`Ranker`):**
-    * Average embeddings are calculated, and the thematic and frequency classifiers update the `parameters` table.
-    * `rank_news()`, based on all factors, calculates a final score and populates the `ranks` table.
-    * The logic from `top25.py` selects the best, non-similar candidates, populates the `top` table, and sends them to OpenAI for AI-based scoring.
+| Component | Description |
+|-----------|-------------|
+| `article_selector.py` | Selects articles from the last N hours that haven't been embedded yet |
+| `chunker.py` | Splits articles into overlapping chunks (512 chars, 256 overlap) |
+| `embedding.py` | Generates embeddings using `Metric-AI/armenian-text-embeddings-1` |
+| `ner.py` | Extracts named entities using `daviddallakyan2005/armenian-ner` |
 
-4.  **Content Generation Stage (`Composer`):**
-    * `get_next_unprocessed_top_id()` selects the highest-scoring but not-yet-processed article from the `top` table.
-    * `prompt_gen_request` and `prompt_gen_request_ru` functions prepare a prompt for OpenAI by gathering the main article and context from similar articles.
-    * `generate_content_with_openai` and `generate_content_with_openai_ru` receive the generated text.
-    * `save_processed` and `save_processed_ru` save the final result in the `processed` table.
+**Embedding Flow:**
+```python
+# Chunk Configuration
+max_chunk_size = 512
+overlap_size = 256
 
-5.  **Publishing Stage (`Spreader`):**
-    * The `spreader_block`, running in a separate thread, uses the `select_to_publish()` function to choose the best candidate for publication based on urgency and other rules.
-    * `publishing_cycle` prepares and sends the message to the corresponding Telegram channel using the `publish_to_telegram` function.
+# Embedding Model
+model = "Metric-AI/armenian-text-embeddings-1"
+prefix = "passage: "  # For documents
+query_prefix = "query: "  # For queries
+```
 
-## **Technology Stack**
+**NER Pipeline:**
+```python
+# Model: daviddallakyan2005/armenian-ner
+# Strategy: "simple" aggregation
+# Entities are merged if consecutive and same type
+```
 
-* **Language:** Python 3.10+
-* **Database:** PostgreSQL
-* **ORM:** SQLAlchemy
-* **AI/ML:**
-    * `sentence-transformers` (using the `Metric-AI/armenian-text-embeddings-1` model)
-    * `transformers` (using the `daviddallakyan2005/armenian-ner` model)
-    * OpenAI API (`gpt-4o`, `gpt-4.1`)
-* **Core Libraries:** `psycopg2-binary`, `numpy`, `requests`, `python-dotenv`, `python-telegram-bot`, `threading`.
+---
 
-## **Setup and Installation**
+### 2. 📊 Ranker Module (`ranker/`)
 
-### **1. Prerequisites**
+Scores and ranks articles using multiple factors.
 
-* Python 3.10+
-* A running PostgreSQL server (local or remote)
+#### Ranking Weights
+| Factor | Weight | Description |
+|--------|--------|-------------|
+| Thematic Importance | 25% | Topic category score from corpus |
+| NER Content Importance | 32% | Named entity significance score |
+| Frequency Importance | 28% | Similarity with other recent articles |
+| Source Importance | 15% | Media outlet credibility rating |
 
-### **2. Installation Steps**
+**Thematic Classification:**
+```python
+# Categories: Միdelays (International), Անdelays (Security), Քdelays (Political), etc.
+# Similarity threshold: 0.75 for primary category
+# Secondary threshold: 0.50 for hybrid categories (e.g., "Politics-Security")
+```
 
-1.  **Clone the repository:**
-    ```bash
-    git clone [your-repository-url]
-    cd [your-repository-name]
-    ```
+**Frequency Detection:**
+```python
+# Cosine similarity threshold: ≥ 0.75
+# Compares against last 100 articles
+# Identifies duplicate/similar stories
+```
 
-2.  **Create a virtual environment and activate it:**
-    ```bash
-    python -m venv .venv
-    # Windows
-    .\.venv\Scripts\activate
-    # macOS/Linux
-    source .venv/bin/activate
-    ```
+**AI Scoring (Top25):**
+```python
+# OpenAI GPT-4o evaluates:
+# - Importance (1-5)
+# - Urgency (1-3)  
+# - Domestic sentiment (neutral/pro/anti)
+# - Geopolitical orientation (proarmenian/antiarmenian/neutral)
 
-3.  **Create a PostgreSQL database:**
-    * Using pgAdmin or another tool, create a new, empty database (e.g., `Dpir_database`).
-    * Ensure you have a user with the necessary privileges for this database.
+# Final Score = 0.55 × total_score + 0.45 × ai_score
+```
 
-4.  **Install the required libraries:**
-    Create a `requirements.txt` file with the following content and run the command `pip install -r requirements.txt`.
+---
 
-    ```
-    # requirements.txt
-    sqlalchemy
-    psycopg2-binary
-    requests
-    python-dotenv
-    numpy
-    sentence-transformers
-    transformers
-    torch
-    python-telegram-bot
-    openai
-    ```
+### 3. ✍️ Composer Module (`composer/`)
 
-5.  **Configure environment variables:**
-    Create a `.env` file by copying `.env.example` (if it exists) or by creating a new file. Fill in the required values.
+Generates AI-enhanced content in Armenian and Russian.
 
-    ```
-    # .env
-    # API Keys
-    TOKEN_APP_KEY="your_secret_api_key_for_fetching_articles"
-    OPENAI_API_KEY="your_openai_api_key"
+**Prompt Architecture:**
+```python
+# Base Components:
+ROLE1 = "Professional Armenian news editor for Telegram"
+ROLE2 = "Professional Russian news editor for Armenian news"
 
-    # Telegram Tokens
-    TELEGRAM_BOT_TOKEN="your_armenian_channel_bot_token"
-    TELEGRAM_BOT_TOKEN_RU="your_russian_channel_bot_token"
+# Operational Modes:
+OPERATIONAL_HIGH    # Concise, fast, neutral
+OPERATIONAL_BALANCED # Include context, essential facts
 
-    # PostgreSQL Connection Details
-    DB_USER="postgres"
-    DB_PASSWORD="your_postgres_password"
-    DB_HOST="localhost"
-    DB_PORT="5432"
-    DB_NAME="Dpir_database"
-    ```
+# Objectivity Spectrum:
+OBJECTIVITY_NEUTRAL        # No bias
+OBJECTIVITY_TOPIC_ADJUSTED # Armenia's national interests perspective
 
-6.  **Create the tables in the database:**
-    * Take the content of your `full_schema_dump.sql` file.
-    * Using pgAdmin's Query Tool, execute that SQL script on your newly created empty database to create all tables and relationships.
+# Output Format:
+TELEGRAM_OUTPUT_FORMAT = 'title: "...", content: "..."'
+```
 
-### **3. Running the Application**
+**Geopolitical Adaptation:**
+```python
+if geopolitical == "antiarmenian":
+    prompt += OBJECTIVITY_TOPIC_ADJUSTED + STYLE_REPHRASED
+else:
+    prompt += OBJECTIVITY_NEUTRAL + STYLE_DIRECT
+```
 
-After ensuring everything is configured correctly, run the main script.
+---
+
+### 4. 📤 Spreader Module (`spreader/`)
+
+Manages intelligent content publishing to Telegram.
+
+**Publishing Channels:**
+| Language | Channel | Bot Token Env |
+|----------|---------|---------------|
+| Armenian | @newsarmaipowerd | `TELEGRAM_BOT_TOKEN` |
+| Russian | @newsrusaipowerd | `TELEGRAM_BOT_TOKEN_RU` |
+
+**Publishing Logic:**
+```python
+# Priority: Urgency 3 (ultra-urgent) → High score → Oldest first
+
+# Adaptive Sleep Intervals:
+# urgency > 1        → 2 minutes
+# not_published > 12 → 3 minutes  
+# not_published > 8  → 4 minutes
+# not_published > 5  → 5 minutes
+# default            → 6 minutes
+```
+
+**Message Format (MarkdownV2):**
+```
+*Title*
+
+Content text here...
+
+*[Ավdelays](source_url)*
+
+@newsarmaipowerd
+```
+
+---
+
+### 5. 🔍 Retriever Module (`retriever/`)
+
+Provides RAG-based question answering over the news corpus.
+
+**Query Flow:**
+```
+User Question → Query Embedding → Semantic Search → Top K Articles → LLM Generation → Answer
+```
+
+**Configuration:**
+```python
+TOP_ID = 20  # Number of articles to retrieve
+OPENAI_MODEL = "gpt-4.1"
+```
+
+**System Role:**
+```python
+# Political scientist persona
+# Aware of social/political developments
+# Must cite sources with URL and date
+# Direct quotes in Armenian quotation marks («»)
+# All responses in Armenian
+```
+
+---
+
+## 🗄️ Database Schema
+
+### PostgreSQL Tables
+
+```sql
+-- Core News Table
+CREATE TABLE news (
+    id SERIAL PRIMARY KEY,
+    website_id INTEGER REFERENCES websites(id),
+    url VARCHAR,
+    title VARCHAR,
+    content TEXT,
+    published_at TIMESTAMP,
+    meta JSONB
+);
+
+-- Chunk Embeddings (One-to-Many)
+CREATE TABLE embeddings (
+    id SERIAL PRIMARY KEY,
+    article_id INTEGER REFERENCES news(id) ON DELETE CASCADE,
+    chunk_content TEXT,
+    chunk_start INTEGER,
+    chunk_end INTEGER,
+    embedding BYTEA
+);
+
+-- Article Parameters (One-to-One)
+CREATE TABLE parameters (
+    id INTEGER PRIMARY KEY REFERENCES news(id) ON DELETE CASCADE,
+    category VARCHAR,
+    aver_embedding BYTEA,
+    similarity JSONB,
+    entities JSONB
+);
+
+-- Ranking Scores (One-to-One)
+CREATE TABLE ranks (
+    id INTEGER PRIMARY KEY REFERENCES news(id) ON DELETE CASCADE,
+    topic_importance REAL,
+    ner_content_importance REAL,
+    frequency_importance REAL,
+    source_importance REAL,
+    total_score REAL
+);
+
+-- Top Candidates (One-to-One)
+CREATE TABLE top (
+    id INTEGER PRIMARY KEY REFERENCES news(id) ON DELETE CASCADE,
+    total_score REAL,
+    ai_score REAL,
+    urgency INTEGER,
+    sentiment VARCHAR,
+    geopolitical VARCHAR,
+    final_score REAL
+);
+
+-- Processed Content (One-to-One)
+CREATE TABLE processed (
+    base_id INTEGER PRIMARY KEY REFERENCES news(id) ON DELETE CASCADE,
+    title VARCHAR,
+    generated_content TEXT,
+    published VARCHAR,
+    title_r VARCHAR,
+    generated_content_r TEXT,
+    published_r VARCHAR
+);
+
+-- Named Entities
+CREATE TABLE entities (
+    id SERIAL PRIMARY KEY,
+    entity_group VARCHAR,
+    score REAL,
+    word VARCHAR,
+    ner_score REAL,
+    category_id INTEGER REFERENCES entity_categories(id)
+);
+
+CREATE TABLE entity_categories (
+    id SERIAL PRIMARY KEY,
+    code INTEGER,
+    path VARCHAR,
+    ner_category_index INTEGER,
+    ner_category_opp_index INTEGER
+);
+```
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+```bash
+# Python 3.8+
+# PostgreSQL 12+
+```
+
+### Installation
+
+```bash
+# Clone the repository
+git clone <repository_url>
+cd RAG
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Additional dependencies (may be needed)
+pip install psycopg2-binary python-dotenv transformers torch
+```
+
+### Environment Variables
+
+Create a `.env` file:
+
+```env
+# Database Configuration
+DB_USER=postgres
+DB_PASSWORD=your_password
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=your_database_name
+
+# OpenAI API
+OPENAI_API_KEY=sk-...
+
+# Telegram Bots
+TELEGRAM_BOT_TOKEN=your_armenian_bot_token
+TELEGRAM_BOT_TOKEN_RU=your_russian_bot_token
+
+# Optional: Anthropic
+ANTHROPIC_API_KEY=sk-ant-...
+```
+
+### Database Setup
+
+```bash
+# Create database
+psql -U postgres -c "CREATE DATABASE your_database_name;"
+
+# Apply schema
+psql -U postgres -d your_database_name -f schema.sql
+
+# (Optional) Migrate from SQLite
+python migrate_data.py
+```
+
+---
+
+## 🏃 Running the System
+
+### Main Pipeline (Full Automation)
 
 ```bash
 python main.py
 ```
 
-You will begin to see logs indicating the various stages of the system's operation.
+This starts three concurrent threads:
+1. **Main Processing Loop** - Collect, process, rank, generate content
+2. **Spreader Loop** - Publish to Telegram on schedule
+3. **Monitor Loop** - Watch for urgent content
+
+### RAG Query Interface
+
+```bash
+python main_out.py
+```
+
+Interactive Q&A over the news corpus:
+```
+ Delays որdelays delays delays delays:
+> Delays վdelays delays delays delays Delaysdelays?
+```
+
+---
+
+## 📊 Processing Pipeline
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                        MAIN PROCESSING LOOP                          │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  1. SELECT NEW ARTICLES (last 1 hour, unprocessed)                   │
+│         ↓                                                            │
+│  2. CHUNK ARTICLES (512 chars, 256 overlap)                          │
+│         ↓                                                            │
+│  3. COMPUTE EMBEDDINGS (armenian-text-embeddings-1)                  │
+│         ↓                                                            │
+│  4. RUN NER (armenian-ner model)                                     │
+│         ↓                                                            │
+│  5. UPDATE AVERAGE EMBEDDINGS (per article)                          │
+│         ↓                                                            │
+│  6. THEMATIC CLASSIFICATION (topic corpus similarity)                │
+│         ↓                                                            │
+│  7. FREQUENCY CLASSIFICATION (duplicate detection)                   │
+│         ↓                                                            │
+│  8. RANK NEWS (multi-factor scoring)                                 │
+│         ↓                                                            │
+│  9. REFRESH TOP 25 + AI SCORING (GPT-4o evaluation)                  │
+│         ↓                                                            │
+│  10. GENERATE CONTENT (Armenian + Russian, GPT-4.1)                  │
+│         ↓                                                            │
+│  [Sleep 90 seconds → Repeat]                                         │
+│                                                                      │
+└─────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────┐
+│                        SPREADER LOOP                                 │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  1. SELECT TO PUBLISH (urgency → score → age priority)               │
+│         ↓                                                            │
+│  2. PUBLISH ARMENIAN (Telegram @newsarmaipowerd)                     │
+│         ↓                                                            │
+│  3. PUBLISH RUSSIAN (Telegram @newsrusaipowerd)                      │
+│         ↓                                                            │
+│  [Adaptive sleep 2-6 minutes based on queue/urgency]                 │
+│                                                                      │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 🔧 Configuration Files
+
+### `data/tamplates/thematic_corpus.json`
+
+Defines topic categories with example articles for classification:
+
+```json
+[
+  {
+    "category": "Միdelays",  // International
+    "score": 3,
+    "examples": ["Example news articles..."]
+  },
+  {
+    "category": "Delays",  // Security
+    "score": 6,
+    "examples": [...]
+  }
+]
+```
+
+### `data/tamplates/media_rating.json`
+
+Source credibility ratings (1-5):
+
+```json
+[
+  {"url": "armenpress.am", "score": 5},
+  {"url": "news.am", "score": 5},
+  {"url": "hraparak.am", "score": 2},
+  {"url": "iravunk.com", "score": 0}
+]
+```
+
+---
 
-### **Project Structure**
+## 🛠️ Key Technical Details
 
-/
-├── collector/          # Modules for article collection, processing, embedding, and NER
-│   ├── get_api.py
-│   ├── chunker.py
-│   ├── embedding.py
-│   └── ner.py
-│   └── utils.py
-├── ranker/             # Modules for ranking algorithms
-│   ├── frequency_classifier.py
-│   ├── thematic_classifier.py
-│   ├── ranking.py
-│   ├── top25.py
-│   └── ner_importance.py
-├── composer/           # Modules for AI-powered content generation
-│   ├── composing.py
-│   ├── composing_ru.py
-│   └── selector.py
-├── spreader/           # Modules for publishing to Telegram
-│   ├── publishing.py
-│   ├── selector.py
-│   └── telegram_message.py
-├── db.py               # SQLAlchemy configuration and all model definitions
-├── main.py             # Application entry point that runs the main cycle
-├── .env                # (Must be created) File for secret keys and configurations
-└── README.md           # This file
+### Embedding Model
+- **Model**: `Metric-AI/armenian-text-embeddings-1`
+- **Type**: Sentence Transformers
+- **Normalization**: Enabled
+- **Prefix**: `passage:` for documents, `query:` for queries
 
+### NER Model
+- **Model**: `daviddallakyan2005/armenian-ner`
+- **Framework**: Hugging Face Transformers
+- **Aggregation**: Simple (merges adjacent same-type entities)
 
-# **Հայերեն**
+### LLM Configuration
+- **Provider**: OpenAI
+- **Model**: GPT-4.1 (content generation), GPT-4o (scoring)
+- **Temperature**: 0.1-0.2 (low for consistency)
 
-## AI-Powered News Pipeline - Նորությունների հավաքագրման և բովանդակության ստեղծման համակարգ
-Սա բազմաթրեդային Python հավելված է, որը նախատեսված է հայկական լրատվական աղբյուրներից նորությունների ավտոմատ հավաքագրման, մշակման, վերլուծության, վարկանիշավորման և դրանց հիման վրա եզակի բովանդակության (հայերեն և ռուսերեն) գեներացման համար՝ հետագայում Telegram ալիքներում հրապարակելու նպատակով։
+### Database
+- **Type**: PostgreSQL with JSONB support
+- **ORM**: SQLAlchemy
+- **Embedding Storage**: BYTEA (binary)
 
-## Հիմնական հնարավորություններ
-###Ավտոմատ հավաքագրում: Պարբերաբար ստանում է նոր հոդվածներ տարբեր լրատվական կայքերից՝ արտաքին API-ի միջոցով։
+---
 
-Խելացի մշակում:
+## 📝 API Reference
 
-Տեքստը բաժանում է տրամաբանական մասերի (chunks)։
+### Collector Functions
 
-Յուրաքանչյուր մասի համար ստեղծում է վեկտորային ներկայացում (embedding)՝ sentence-transformers-ի միջոցով։
+```python
+# Select unprocessed articles from last N hours
+select_new_articles(time_window_hours: int = 1) -> List[News]
 
-Կատարում է Անվանական էակների ճանաչում (Named Entity Recognition - NER)՝ տեքստից առանցքային անձանց, տեղանունները և կազմակերպությունները դուրս բերելու համար։
+# Chunk articles and store in embeddings table
+chunk_articles_and_store(articles, max_chunk_size=512, overlap_size=256)
 
-Բազմաշերտ վարկանիշավորում: Հոդվածները գնահատվում են մի քանի գործոնների հիման վրա՝ թեմատիկ համապատասխանություն, հաճախականություն, NER-երի կարևորություն, աղբյուրի հեղինակություն։
+# Compute and store embeddings
+embed_chunks(chunks, batch_size=32, prefix="passage: ", save_mode="update")
 
-AI-ի միջոցով գնահատում և բովանդակության ստեղծում:
+# Run NER pipeline
+run_ner_on_articles(articles, ner_pipeline) -> List[Dict]
+```
 
-Լավագույն հոդվածներն ուղարկվում են OpenAI-ին (GPT-4o/4.1)՝ լրացուցիչ գնահատման (կարևորություն, հրատապություն, տրամադրություն)։
+### Ranker Functions
 
-Ամենաբարձր վարկանիշ ունեցող նյութերի հիման վրա ստեղծվում են նոր, համառոտագրված վերլուծական տեքստեր՝ հայերեն և ռուսերեն լեզուներով։
+```python
+# Update average embeddings per article
+update_aver_embeddings()
 
-Ավտոմատ հրապարակում: Գեներացված բովանդակությունը, ըստ հրատապության և այլ կանոնների, հրապարակվում է երկու առանձին Telegram ալիքներում։
+# Classify articles by topic
+run_thematic_classifier()
 
-Հզոր տվյալների բազա: Համակարգն օգտագործում է PostgreSQL տվյալների բազա՝ SQLAlchemy ORM-ի միջոցով, որն ապահովում է բարձր արտադրողականություն, մասշտաբայնություն և տվյալների ամբողջականություն՝ շնորհիվ հստակ սահմանված կապերի (Foreign Keys)։
+# Detect similar articles
+run_frequency_classifier()
 
-## Համակարգի ճարտարապետություն և աշխատանքի հոսք
-Համակարգն աշխատում է որպես անընդհատ ցիկլ՝ մի քանի զուգահեռ թրեդների միջոցով։
+# Compute final ranking
+rank_news()
 
-Հավաքագրման փուլ (Collector):
+# Select top 25 and get AI scores
+refresh_top_and_score() -> Dict
+```
 
-main.py-ի հիմնական ցիկլը կանչում է fetch_articles()՝ API-ից հոդվածներ ստանալու համար։
+### Composer Functions
 
-filter_new_articles()-ը զտում է միայն նոր հոդվածները՝ համեմատելով դրանք content աղյուսակի հետ։
+```python
+# Get next unprocessed article ID
+get_next_unprocessed_top_id() -> int | None
 
-Նոր հոդվածները պահպանվում են content աղյուսակում։
+# Generate prompt for article
+prompt_gen_request(base_id) -> Tuple[str, Dict]
 
-Մշակման փուլ (Collector):
+# Generate content with OpenAI
+generate_content_with_openai(prompt, content) -> str
 
-chunk_articles_and_store()-ը բաժանում է հոդվածների տեքստերը մասերի և պահպանում embeddings աղյուսակում։
+# Save processed content
+save_processed(base_id, openai_response)
+```
 
-embed_chunks()-ը հաշվարկում է վեկտորային embedding-ները և թարմացնում embeddings աղյուսակը։
+### Spreader Functions
 
-run_ner_on_articles()-ը կատարում է NER վերլուծություն, պահպանում արդյունքները ner_results աղյուսակում և ավելացնում նոր էնթիթիները entities աղյուսակում։
+```python
+# Select content for publishing
+select_to_publish()
 
-Վերլուծության և վարկանիշավորման փուլ (Ranker):
+# Execute publishing cycle
+publishing_cycle() -> int  # Returns sleep time
+publishing_cycle_ru()
 
-Հաշվարկվում են միջին embedding-ները, թեմատիկ և հաճախականության դասակարգիչները թարմացնում են parameters աղյուսակը։
+# Get current urgent count
+get_urgent_value() -> int
+```
 
-rank_news()-ը, հիմնվելով բոլոր գործոնների վրա, հաշվարկում է վերջնական գնահատականը և լրացնում ranks աղյուսակը։
+### Retriever Functions
 
-top25.py-ի տրամաբանությունը ընտրում է լավագույն, իրար ոչ նման թեկնածուներին, լրացնում top աղյուսակը և ուղարկում OpenAI-ին՝ AI-ի կողմից գնահատման համար։
+```python
+# Embed a query
+embed_query(text: str) -> np.ndarray
 
-Բովանդակության ստեղծման փուլ (Composer):
+# Get top K unique articles by similarity
+get_top_k_unique_articles(query_emb, top_id=20) -> List[Dict]
 
-get_next_unprocessed_top_id()-ը top աղյուսակից ընտրում է ամենաբարձր վարկանիշով, բայց դեռ չմշակված հոդվածը։
+# Generate answer using LLM
+generate_answer(query, articles, provider="openai") -> Dict
+```
 
-prompt_gen_request և prompt_gen_request_ru ֆունկցիաները, հավաքելով հիմնական նյութը և նմանատիպ նյութերից կոնտեքստ, պատրաստում են հարցում (prompt) OpenAI-ի համար։
+---
 
-generate_content_with_openai և generate_content_with_openai_ru ֆունկցիաները ստանում են գեներացված տեքստը։
+## 🔒 Security Notes
 
-save_processed և save_processed_ru ֆունկցիաները պահպանում են վերջնական արդյունքը processed աղյուսակում։
+- Store API keys in `.env` file (never commit!)
+- Use environment variables for sensitive data
+- Database credentials should be secured
+- Telegram bot tokens are sensitive
 
-Հրապարակման փուլ (Spreader):
+---
 
-Առանձին թրեդով աշխատող spreader_block-ը select_to_publish() ֆունկցիայի միջոցով ընտրում է հրապարակման ենթակա լավագույն թեկնածուին՝ հիմնվելով հրատապության և այլ կանոնների վրա։
+## 📄 License
 
-publishing_cycle-ը նախապատրաստում և publish_to_telegram ֆունկցիայի միջոցով ուղարկում է հաղորդագրությունը համապատասխան Telegram ալիք։
+[Specify your license here]
 
-## Տեխնոլոգիական բազա (Tech Stack)
-Լեզու: Python 3.10+
+---
 
-Տվյալների բազա: PostgreSQL
+## 🤝 Contributing
 
-ORM: SQLAlchemy
+[Contribution guidelines]
 
-AI/ML:
+---
 
-sentence-transformers (Metric-AI/armenian-text-embeddings-1 մոդել)
+## 📞 Support
 
-transformers (daviddallakyan2005/armenian-ner մոդել)
-
-OpenAI API (gpt-4o, gpt-4.1)
-
-Հիմնական գրադարաններ: psycopg2-binary, numpy, requests, python-dotenv, python-telegram-bot, threading։
-
-## Տեղադրում և գործարկում
-1. Նախապայմաններ
-Python 3.10+
-
-PostgreSQL սերվեր (լոկալ կամ հեռակա)
-
-2. Տեղադրման քայլեր
-Կլոնավորեք ռեպոզիտորիան:
-
-Bash
-
-git clone [your-repository-url]
-cd [your-repository-name]
-Ստեղծեք վիրտուալ միջավայր և ակտիվացրեք այն:
-
-Bash
-
-python -m venv .venv
-# Windows
-.\.venv\Scripts\activate
-# macOS/Linux
-source .venv/bin/activate
-Ստեղծեք PostgreSQL տվյալների բազա:
-
-pgAdmin-ի կամ այլ գործիքի միջոցով ստեղծեք նոր, դատարկ տվյալների բազա (օրինակ՝ Dpir_database)։
-
-Համոզվեք, որ ունեք օգտատեր՝ համապատասխան իրավունքներով։
-
-Տեղադրեք անհրաժեշտ գրադարանները:
-Ստեղծեք requirements.txt ֆայլ հետևյալ պարունակությամբ և գործարկեք pip install -r requirements.txt հրամանը։
-
-# requirements.txt
-sqlalchemy
-psycopg2-binary
-requests
-python-dotenv
-numpy
-sentence-transformers
-transformers
-torch
-python-telegram-bot
-openai
-Կարգավորեք միջավայրի փոփոխականները:
-Ստեղծեք .env ֆայլ՝ պատճենելով .env.example-ը (եթե այն կա) կամ ստեղծելով նորը։ Լրացրեք անհրաժեშտ արժեքները։
-
-# .env
-# API-ի բանալիներ
-TOKEN_APP_KEY="your_secret_api_key_for_fetching_articles"
-OPENAI_API_KEY="your_openai_api_key"
-
-# Telegram-ի բանալիներ
-TELEGRAM_BOT_TOKEN="your_armenian_channel_bot_token"
-TELEGRAM_BOT_TOKEN_RU="your_russian_channel_bot_token"
-
-# PostgreSQL-ի միացման տվյալներ
-DB_USER="postgres"
-DB_PASSWORD="your_postgres_password"
-DB_HOST="localhost"
-DB_PORT="5432"
-DB_NAME="Dpir_database"
-Ստեղծեք աղյուսակները բազայում:
-
-Վերցրեք ձեր full_schema_dump.sql ֆայլի պարունակությունը։
-
-pgAdmin-ի Query Tool-ի միջոցով գործարկեք այդ SQL սկրիպտը ձեր ստեղծած դատարկ բազայի վրա՝ բոլոր աղյուսակները և կապերը ստեղծելու համար։
-
-3. Հավելվածի գործարկում
-Համոզվելուց հետո, որ ամեն ինչ ճիշտ է կարգավորված, գործարկեք հիմնական սկրիպտը։
-
-Bash
-
-python main.py
-Դուք կսկսեք տեսնել լոգեր, որոնք ցույց են տալիս համակարգի աշխատանքի տարբեր փուլերը։
-
-Նախագծի կառուցվածք
-/
-├── collector/          # Հոդվածների հավաքագրման, մշակման, embedding-ի և NER-ի մոդուլներ
-│   ├── get_api.py
-│   ├── chunker.py
-│   ├── embedding.py
-│   └── ner.py
-│   └── utils.py
-├── ranker/             # Վարկանիշավորման ալգորիթմների մոդուլներ
-│   ├── frequency_classifier.py
-│   ├── thematic_classifier.py
-│   ├── ranking.py
-│   ├── top25.py
-│   └── ner_importance.py
-├── composer/           # AI-ի միջոցով բովանդակության գեներացման մոդուլներ
-│   ├── composing.py
-│   ├── composing_ru.py
-│   └── selector.py
-├── spreader/           # Telegram-ում հրապարակման մոդուլներ
-│   ├── publishing.py
-│   ├── selector.py
-│   └── telegram_message.py
-├── db.py               # SQLAlchemy-ի կարգավորումներ և բոլոր մոդելների սահմանում
-├── main.py             # Հավելվածի մուտքի կետ, որը գործարկում է հիմնական ցիկլը
-├── .env                # (Պետք է ստեղծվի) Գաղտնի բանալիների և կարգավորումների ֆայլ
-└── README.md           # Այս ֆայլը
+[Contact information]
